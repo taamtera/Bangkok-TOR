@@ -31,23 +31,23 @@ export async function listControlledTags({ category = null, search = null, statu
   }
 
   if (status) {
-    filter.status = status;
+    filter.status = status === 'active' ? { $ne: 'inactive' } : status;
   }
 
   if (search?.trim()) {
     const expression = new RegExp(escapeRegex(search.trim()), 'iu');
-    filter.$or = [{ name: expression }, { aliases: expression }];
+    filter.$or = [{ name: expression }, { text: expression }, { aliases: expression }];
   }
 
   return tags().find(filter).sort({ category: 1, name: 1 }).toArray();
 }
 
-export async function createControlledTag({ name, category, aliases = [], description = null, createdByUserId }) {
+export async function createControlledTag({ name, category, type, aliases = [], description = null, createdByUserId }) {
   const normalizedName = normalizeName(name);
   const readableSlug = slugify(name);
   const slug = readableSlug || `${category}-${createHash('sha256').update(normalizedName).digest('hex').slice(0, 12)}`;
   const existing = await tags().findOne({
-    $or: [{ slug }, { category, normalizedName }]
+    $or: [{ slug }, { category, normalizedName }, { category, text: name.trim() }]
   });
 
   if (existing) {
@@ -57,9 +57,11 @@ export async function createControlledTag({ name, category, aliases = [], descri
   const now = new Date();
   const document = {
     name: name.trim(),
+    text: name.trim(),
     normalizedName,
     slug,
     category,
+    type,
     aliases: [...new Set(aliases.map((alias) => alias.trim()).filter(Boolean))],
     description: description?.trim() || null,
     status: 'active',
@@ -74,7 +76,7 @@ export async function createControlledTag({ name, category, aliases = [], descri
 export async function assertActiveTagIds(tagIds) {
   const uniqueTagIds = [...new Set(tagIds)];
   const objectIds = uniqueTagIds.map((tagId) => toObjectId(tagId, 'tagId'));
-  const activeCount = await tags().countDocuments({ _id: { $in: objectIds }, status: 'active' });
+  const activeCount = await tags().countDocuments({ _id: { $in: objectIds }, status: { $ne: 'inactive' } });
 
   if (activeCount !== objectIds.length) {
     throw httpError(400, 'UNKNOWN_TAG', 'Every assigned tag must exist and be active.');

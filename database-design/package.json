@@ -11,7 +11,8 @@
     "db:setup": "node scripts/setup-database.mjs",
     "db:verify": "node scripts/verify-database.mjs",
     "db:verify-enrichment-removed": "node scripts/verify-enrichment-removed.mjs",
-    "db:seed": "node scripts/seed-demo.mjs"
+    "db:seed": "node scripts/seed-demo.mjs",
+    "db:sync-tag-metadata": "node scripts/sync-tag-metadata.mjs"
   },
   "dependencies": {
     "mongodb": "^7.5.0"

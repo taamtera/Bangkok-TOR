@@ -13,7 +13,8 @@ export function ProjectStages({ project }: { project: TORContract }) {
           {t(getAnnouncementStage(code))}
         </span>
       ))}
-      {project.statusOrderAmbiguous && <span className="text-amber-700 dark:text-amber-300">{t("Same publication date; order unknown")}</span>}
+      {/* Same-day announcements can be published together, e.g. reference price
+          and invitation. Show each observed stage without an ordering warning. */}
     </div>
   );
 }

@@ -76,6 +76,8 @@ try {
   for (const tag of tagSamples) {
     tagIds[tag.slug] = await upsertAndGetId(database.collection('tags'), { slug: tag.slug }, {
       ...tag,
+      text: tag.name,
+      type: tag.category === 'certification' ? 'contractor_requirement' : 'specification',
       description: null,
       status: 'active',
       createdByUserId: null

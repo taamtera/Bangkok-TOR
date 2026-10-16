@@ -410,8 +410,7 @@ const indexes = {
     [{ 'tagAssignments.tagId': 1, verificationStatus: 1 }, { name: 'ix_companies_tags_verification' }]
   ],
   tags: [
-    [{ category: 1, normalizedName: 1 }, { unique: true, name: 'uq_tags_category_name' }],
-    [{ slug: 1 }, { unique: true, name: 'uq_tags_slug' }],
+    [{ category: 1, text: 1 }, { unique: true, name: 'uq_tags_category_text' }],
     [{ category: 1, status: 1, name: 1 }, { name: 'ix_tags_category_status_name' }],
     [{ aliases: 1 }, { name: 'ix_tags_aliases' }]
   ],
@@ -436,6 +435,7 @@ const indexes = {
 };
 
 const obsoleteIndexes = {
+  tags: ['uq_tags_category_name', 'uq_tags_slug'],
   thumbnails: retiredIdentityIndexes.thumbnails,
   users: ['uq_users_email'],
   ai_evaluations: ['ix_ai_status_created'],
@@ -472,12 +472,15 @@ function validatorFor(definition) {
 
 async function createOrUpdateCollection(database, collectionName, definition) {
   const exists = await database.listCollections({ name: collectionName }, { nameOnly: true }).hasNext();
-  const validator = validatorFor(definition);
+  // The simplified tag contract is specified in the application, not enforced
+  // through MongoDB JSON-schema validation. Optional metadata may be omitted.
+  const validator = collectionName === 'tags' ? {} : validatorFor(definition);
+  const validationLevel = collectionName === 'tags' ? 'off' : 'strict';
 
   if (!exists) {
     await database.createCollection(collectionName, {
       validator,
-      validationLevel: 'strict',
+      validationLevel,
       validationAction: 'error'
     });
     console.log(`Created collection: ${collectionName}`);
@@ -487,7 +490,7 @@ async function createOrUpdateCollection(database, collectionName, definition) {
   await database.command({
     collMod: collectionName,
     validator,
-    validationLevel: 'strict',
+    validationLevel,
     validationAction: 'error'
   });
   console.log(`Updated validation: ${collectionName}`);

@@ -11,7 +11,7 @@ const LABELS: Record<string, string> = {
   draft_tender_published: 'Draft Tender Published', invitation_published: 'Invitation Published',
   award_published: 'Award Published', invitation_cancelled: 'Invitation Cancelled',
   award_cancelled: 'Award Cancelled', invitation_amended: 'Invitation Amended',
-  award_amended: 'Award Amended', multiple_announcements_same_day: 'Multiple stages on the same day',
+  award_amended: 'Award Amended', multiple_announcements_same_day: 'Multiple announcements',
   unknown: 'Stage unavailable'
 };
 export function getAnnouncementStage(code: string) {

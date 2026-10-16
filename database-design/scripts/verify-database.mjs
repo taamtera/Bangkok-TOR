@@ -40,7 +40,7 @@ const expectedRequiredFields = {
   ...Object.fromEntries(Object.entries(ingestionDefinitions).map(([name, definition]) => [name, definition.required])),
   rss_query_state: ['queryKey', 'reportedCount', 'itemsReceived', 'complete', 'splitLevel', 'status', 'retryCount', 'lastCheckedAt'],
   users: ['notificationPreferences'],
-  tags: ['name', 'normalizedName', 'slug', 'category', 'aliases', 'status'],
+  tags: [],
   ai_evaluations: ['retryCount', 'lastAttemptAt', 'nextAttemptAt', 'lastError'],
   notifications: ['attemptCount', 'nextAttemptAt', 'deliveryError']
 };
@@ -65,7 +65,7 @@ const expectedIndexes = {
   raw_ingestion_items: ['ttl_raw_ingestion_expiry'],
   rss_query_state: ['uq_rss_query_source_key', 'ix_rss_query_retry_queue'],
   audit_logs: ['ttl_audit_expiry'],
-  tags: ['uq_tags_category_name', 'uq_tags_slug', 'ix_tags_category_status_name', 'ix_tags_aliases'],
+  tags: ['uq_tags_category_text', 'ix_tags_category_status_name', 'ix_tags_aliases'],
   companies: ['ix_companies_tags_verification'],
   thumbnails: ['uq_thumbnails_project_id'],
   tor_announcements: ['uq_tors_project_id', 'tx_rss_tors_discovery', 'ix_rss_tors_tags_level'],

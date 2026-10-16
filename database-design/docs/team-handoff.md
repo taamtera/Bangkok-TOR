@@ -94,6 +94,16 @@ Set `expiresAt` only when the team has approved a retention date. Omit it for re
 
 ## Tagging Contract
 
+- Canonical tag fields are `text`, `category`, and required `type`. Current types
+  are `contractor_requirement` and `specification`; extend the vocabulary when
+  adding future types. `name` is retained for compatibility.
+- `requirementLevel` is a TOR-to-tag assignment field, never a canonical tag field.
+- No additional MongoDB validation is imposed by this change. Tags/assignments
+  may omit other optional metadata; do not insert guessed placeholder values.
+- Run `npm run db:sync-tag-metadata` for a preview; append `-- --apply` to backfill
+  the six known catalog entries. The command backs up changed tags and leaves
+  existing validators and TOR/company assignments untouched.
+
 - Use only active records from `tags`; do not save arbitrary free-text tags on TORs or companies.
 - Normalize aliases to their canonical `tagId` before assigning them.
 - TOR tags use `required`, `preferred`, or `informational` requirement levels.

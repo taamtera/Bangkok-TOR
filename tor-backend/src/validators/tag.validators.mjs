@@ -56,8 +56,9 @@ function validateAssignments(body, levelField, allowedLevels) {
 
 export function validateCreateTag(body) {
   const input = body ?? {};
-  const name = requiredString(input.name, 'name', 2);
+  const name = requiredString(input.text ?? input.name, 'text', 2);
   const category = requiredString(input.category, 'category');
+  const type = requiredString(input.type, 'type');
   if (!TAG_CATEGORIES.includes(category)) {
     invalid('category is invalid.');
   }
@@ -69,6 +70,7 @@ export function validateCreateTag(body) {
 
   return {
     name,
+    type,
     category,
     aliases,
     description: optionalString(input.description, 'description')

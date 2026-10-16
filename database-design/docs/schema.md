@@ -277,6 +277,35 @@ Important fields:
 - `aliases`: alternative spellings such as `NodeJS` and `Node JS`
 - `status`: `active` or `inactive`; deactivate used tags instead of deleting them
 
+Canonical tags use `text`, `category`, and **`type`**. `text` is the display label;
+`name` remains a compatible alias for existing code. Every newly created tag must
+specify `type`: currently `contractor_requirement` or `specification`. The first
+classifies contractor eligibility/capability concepts; the second classifies
+products, technical features, architecture, or deliverables. More types can be
+introduced later. These are application/documentation rules; no new MongoDB
+validator is installed. Optional metadata may remain absent.
+
+The unique `uq_tags_category_text` index on `{ category: 1, text: 1 }` supports
+workflows using `$merge.on: ["category", "text"]`. Legacy uniqueness constraints
+on `category + normalizedName` and `slug` are retired. MongoDB validation is off
+for `tags`, allowing the simplified `{text, category, type}` shape without legacy
+fields. `type` is still required by the application contract. Other collection
+validators remain unchanged. Normalize canonical text before reusing/creating
+tags; the index compares exact stored category/text values.
+
+`requirementLevel` belongs only in `tor_announcements.tagAssignments[]`, alongside
+`tagId`, because a tag can be mandatory in one TOR and preferred in another. Never
+store `requirementLevel` in the canonical `tags` collection. Company links continue
+to use `verificationLevel` instead. A contractor's experience using a technology
+is a distinct concept from the technology itself: use clear distinct tag text
+and category, such as a skill/capability versus a technology specification.
+
+For the existing demo vocabulary, Node.js, MongoDB, Docker, Microservices, and Web
+Development are classified as `specification`; ISO 27001 as
+`contractor_requirement`. This describes the vocabulary, not evidence that a
+particular TOR imposes those conditions. The metadata sync preserves tag IDs,
+categories, aliases, assignments, and existing validators.
+
 TOR and company records reference tags using `tagAssignments`. TOR assignments classify a tag as `required`, `preferred`, or `informational`. Company assignments classify evidence as `claimed`, `experienced`, or `verified`. Every assignment records its source, confidence, and review status so AI suggestions cannot silently become verified facts.
 
 ## 15. `ai_evaluations`
