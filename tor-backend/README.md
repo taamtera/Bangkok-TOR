@@ -10,13 +10,13 @@ The frontend must never receive `MONGODB_URI` or connect directly to Atlas.
 
 ## Local Setup
 
-1. Add `MONGODB_URI` and `MONGODB_DB_NAME` to `database-design/.env`.
-2. Run `npm install` from `tor-backend`.
+1. Copy `.env.example` to `tor-backend/.env` and set `MONGODB_URI` and `MONGODB_DB_NAME`.
+2. Install Node 24 or newer and run `npm install` from `tor-backend`.
 3. Run `npm run check`.
 4. Run `npm run dev`.
 5. Open `http://localhost:4000/api/health`.
 
-The backend loads the shared `database-design/.env` automatically. Shell or deployment environment variables take precedence over values in that file. `.env.example` remains available as a reference for backend-only settings such as authentication and CORS.
+The backend loads its own `tor-backend/.env` automatically. Shell or deployment environment variables take precedence. Install Python 3.10 or newer for the matching engine; the Docker image includes Python. Demo requirement matching is opt-in with `MATCHING_DEMO_ENABLED=true` and is restricted to `MONGODB_DB_NAME=tor_software_test`.
 
 ## Current Foundation
 
@@ -76,10 +76,47 @@ Project discovery accepts `search` (all whitespace-separated terms, literal case
 
 - `GET /api/tags`: list active tags; accepts `category` and `search` query parameters
 - `POST /api/tags`: create a controlled tag; system administrator only
+- `GET /api/tags/:tagId`: read a tag, including inactive tags; system administrator only
+- `PATCH /api/tags/:tagId`: update a tag's name, category, aliases, description, or active status; system administrator only. The tag slug remains stable.
+- `DELETE /api/tags/:tagId`: deactivate a tag; system administrator only. Tags are not physically deleted because companies and TORs may reference them.
 - `PUT /api/tags/companies/:companyId`: replace a company's approved tags; company member or system administrator
 - `PUT /api/tags/tors/:projectId`: replace a TOR's approved tags; project manager or system administrator
+- `PUT /api/tags/tors/:projectId/suggestions`: replace pending AI TOR requirement suggestions; project manager or system administrator. Each suggestion requires an active tag, confidence, cited evidence, and a URL matching the TOR's stored announcement or source-document URL; pending suggestions never affect matching.
+- `GET /api/tags/tors/:projectId/suggestions`: list AI suggestions and review history; project manager or system administrator
+- `PATCH /api/tags/tors/:projectId/suggestions/:suggestionId`: approve or reject a suggestion; project manager or system administrator. The submitting account cannot review its own suggestion.
 
-Company updates are restricted to the authenticated user's own company unless the user is a system administrator. API assignments are manual and approved; future AI/crawler workers must save low-confidence suggestions as unapproved records.
+The AI suggestion payload contains a `suggestions` array with `tagId`, `requirementLevel`, `evidence`, `sourceDocumentUrl`, optional `sourcePage`, and `confidence` from 0 to 1.
+
+Company updates are restricted to the authenticated user's own company unless the user is a system administrator. Manual company assignments are approved as company self-reports; TOR AI suggestions are stored separately as unapproved records.
+
+Human catalog maintenance routes require an authenticated `system_admin`. The separate scoped AI worker routes automatically validate PDF quotations and apply supported tags. Legacy pending suggestions continue to require review and do not affect scoring.
+
+Company users (`company_admin` and `company_member`) access matches without a system-administrator role. The saved company profile supplies technologies and qualifications automatically; the matching page does not ask users to re-enter them or approve tags. Profile claims are not independently verified. Matching uses source-validated AI extractions, reviewed requirement assignments, or the explicitly enabled existing demo requirements. Announcement title mentions alone do not become contract requirements. The backend prepares PDF text and accepts evidence-validated AI submissions; the teammate still needs to implement AI interpretation. Privileged maintenance APIs remain available.
+
+## AI requirement integration
+
+- `GET /api/ai/tors/:projectId/source`: prepare current source PDF pages and hash.
+- `POST /api/ai/tors/:projectId/requirements`: validate quotations, reuse/create tags, store requirements and refresh Python matching.
+
+These routes require a scoped `AI_REQUIREMENTS_TOKEN` bearer key, not a human administrator account. See [AI requirements handoff](docs/ai-requirements-handoff.md) for the exact payload, validation limits, deployment and remaining teammate work.
+
+## Rules-based matching API
+
+### Company profile API
+
+- `GET /api/companies/me`: return the authenticated user's linked company profile.
+- `PUT /api/companies/me`: update the linked company's display name, size, district, primary contact email, technologies, and qualification names. Qualification names are stored as objects in `companies.qualifications`; unchanged entries retain existing evidence metadata. Exact profile entries are linked as self-reported `claimed` capabilities and are never marked verified.
+- `POST /api/companies/me/matching-tags/sync`: link the current profile's exact technology and qualification entries to active tags as self-reported `claimed` capabilities. The operation is idempotent and does not create TOR requirements.
+
+All endpoints require a company account and derive the company ID from the authenticated session. Profile saves and explicit syncs link company profile values; the profile remains the only company-facing place to edit those values.
+
+- `GET /api/matches?page=1&limit=20`: compare the signed-in company's saved profile with available contract requirements. Returns coverage, matched/partial/missing clauses, profile evidence, and a demo/source label. Zero-score comparisons remain visible. Requires a linked `company_admin` or `company_member` account.
+- `GET /api/matches/ai-input`: return the profile, projects, and current matching output for the separate AI suitability stage, without contact email or authentication data.
+- `GET /api/recommendations`: reserved for AI project suitability. It currently returns `status: "not_configured"` with no recommendation items until an AI provider is connected.
+
+The live matcher is the Python engine under `matching/`. Policy 3 recognizes explicit aliases and supported requirement clauses, including AND/OR alternatives. Required requirements carry weight 3, preferred requirements weight 1, and informational requirements weight 0. `score` measures requirement coverage; `evidenceScore` separately weights claimed (0.5), experienced (0.75), and verified (1.0) evidence. A high coverage score does not establish certification or overall project suitability. Unsupported free-form clauses remain unassessed rather than guessed. Results are saved in `company_matches`; reads recalculate them, and company/TOR changes refresh saved matches. Profile saves remain successful if matching is temporarily unavailable.
+
+See [Matching and AI handoff](docs/matching-ai-handoff.md) for the demo safeguards, storage migration, API contracts, scoring details, and the remaining AI integration work.
 
 ## Authentication Ownership
 

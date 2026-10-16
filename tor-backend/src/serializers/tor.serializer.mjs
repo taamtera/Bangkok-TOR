@@ -6,6 +6,11 @@ export function serializeTor(tor) {
   const projectId = typeof tor.projectId === 'string' ? tor.projectId : null;
   const result = {
     ...project, projectId,
+    // Expose reviewed annotations and exact, source-cited announcement mentions
+    // used by automatic recommendation candidates. Pending AI suggestions stay private.
+    tagAssignments: Array.isArray(tor.tagAssignments)
+      ? tor.tagAssignments.filter((assignment) => assignment?.reviewStatus === 'approved' || assignment?.reviewStatus === 'auto_detected')
+      : [],
     scope: tor.scope ?? 'department',
     identityScope: tor.identityScope ?? (projectId?.startsWith('P') ? 'plan' : 'project'),
     status: tor.status ?? 'unknown',

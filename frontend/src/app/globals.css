@@ -4,6 +4,7 @@
 
 /* Light Theme Variables */
 :root {
+  --font-inter: Inter, ui-sans-serif;
   --background: #f8fafc;
   --foreground: #0f172a;
   --card-bg: #ffffff;

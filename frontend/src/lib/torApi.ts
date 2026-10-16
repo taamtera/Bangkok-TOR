@@ -24,8 +24,14 @@ export interface BackendTor extends Partial<ProjectFields> {
   } | null;
   tagAssignments?: Array<{
     tagId?: string;
-    requirementLevel?: 'required' | 'preferred' | 'informational';
+    requirementLevel?: 'required' | 'preferred' | 'mentioned' | 'informational';
     evidence?: string | null;
+    reviewStatus?: string | null;
+    source?: string | null;
+    suggestionId?: string | null;
+    confidence?: number | null;
+    sourceDocumentUrl?: string | null;
+    sourcePage?: string | number | null;
   }>;
 }
 
@@ -58,7 +64,7 @@ function mapRequirements(tor: BackendTor): TORRequirement[] {
 }
 
 export function toTorContract(tor: BackendTor): TORContract {
-  if (typeof tor.projectId !== 'string' || !tor.projectId) throw new Error('Project ID must be a non-empty string.');
+  if (typeof tor.projectId !== 'string' || !tor.projectId.trim()) throw new Error('Project ID must be a non-empty string.');
   const title = tor.title?.trim() || 'Untitled TOR announcement';
   const publicationDate = tor.publishedAt || '';
   const documentUrl = tor.documentUrl || tor.url || null;
@@ -117,13 +123,29 @@ export interface DiscoveryFacets {
   methods: Array<{ value: string; count: number }>;
 }
 export async function listTors(options: Record<string, string | number> = {}, signal?: AbortSignal) {
+  const result = await listBackendTors(options, signal);
+  return { items: result.items.map(toTorContract), total: result.pagination.total,
+    pagination: result.pagination, totalAllProjects: result.totalAllProjects,
+    facets: result.facets };
+}
+
+export async function listBackendTors(options: Record<string, string | number> = {}, signal?: AbortSignal) {
   const params = new URLSearchParams({ page: '1', limit: '25' });
   Object.entries(options).forEach(([key, value]) => { if (value !== '') params.set(key, String(value)); });
   const endpoint = resolveApiUrl(`/api/tors?${params}`)!;
   const response = await fetch(endpoint, { credentials: 'include', cache: 'no-store', signal });
   if (!response.ok) throw new Error(`The TOR backend returned HTTP ${response.status}.`);
   const body = await response.json() as BackendTorListResponse & { facets?: DiscoveryFacets; totalAllProjects?: number };
-  return { items: (body.items || []).map(toTorContract), total: body.pagination.total,
-    pagination: body.pagination, totalAllProjects: body.totalAllProjects ?? body.pagination.total,
+  const validItems = (body.items || []).filter(tor => typeof tor.projectId === 'string' && tor.projectId.trim().length > 0);
+  return { items: validItems, pagination: body.pagination, totalAllProjects: body.totalAllProjects ?? body.pagination.total,
     facets: body.facets ?? { departments: [], methods: [] } };
+}
+
+export async function getTor(projectId: string, signal?: AbortSignal): Promise<BackendTor> {
+  const endpoint = resolveApiUrl(`/api/tors/${encodeURIComponent(projectId)}`);
+  if (!endpoint) throw new Error('The TOR API is not configured.');
+  const response = await fetch(endpoint, { credentials: 'include', cache: 'no-store', signal });
+  const body = await response.json().catch(() => null) as { tor?: BackendTor; error?: { message?: string } } | null;
+  if (!response.ok || !body?.tor) throw new Error(body?.error?.message || `TOR details could not be loaded (HTTP ${response.status}).`);
+  return body.tor;
 }

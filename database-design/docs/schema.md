@@ -254,16 +254,16 @@ Recommended events include registration, login success/failure, email verificati
 
 ## 13. `companies`
 
-Stores the software-house profile used for AI matching.
+Stores the software-house profile used for requirement matching and future AI evaluation.
 
 Important fields:
 
 - legal and display names, company size, district, and contact data
 - `technologies`: bounded list such as Next.js, Node.js, MongoDB, and Google Cloud
 - `qualifications`: certification, capability, and experience evidence
-- `profileCompleteness`: matching-readiness percentage
+- `profileCompleteness`: profile completion percentage, separate from requirement coverage
 - `verificationStatus`: `unverified`, `pending`, `verified`, or `rejected`
-- `tagAssignments`: controlled capability tags with provenance, confidence, verification level, review status, and optional evidence
+- `tagAssignments`: controlled capability tags with provenance, confidence, verification level, review status, and evidence. Profile entries are linked as self-reported `claimed` capabilities and are not independently verified.
 
 ## 14. `tags`
 
@@ -306,7 +306,36 @@ Development are classified as `specification`; ISO 27001 as
 particular TOR imposes those conditions. The metadata sync preserves tag IDs,
 categories, aliases, assignments, and existing validators.
 
-TOR and company records reference tags using `tagAssignments`. TOR assignments classify a tag as `required`, `preferred`, or `informational`. Company assignments classify evidence as `claimed`, `experienced`, or `verified`. Every assignment records its source, confidence, and review status so AI suggestions cannot silently become verified facts.
+Canonical tags use `text`, `category`, and **`type`**. `text` is the display label;
+`name` remains a compatible alias for existing code. Every newly created tag must
+specify `type`: currently `contractor_requirement` or `specification`. The first
+classifies contractor eligibility/capability concepts; the second classifies
+products, technical features, architecture, or deliverables. More types can be
+introduced later. These are application/documentation rules; no new MongoDB
+validator is installed. Optional metadata may remain absent.
+
+The unique `uq_tags_category_text` index on `{ category: 1, text: 1 }` supports
+workflows using `$merge.on: ["category", "text"]`. Legacy uniqueness constraints
+on `category + normalizedName` and `slug` are retired. MongoDB validation is off
+for `tags`, allowing the simplified `{text, category, type}` shape without legacy
+fields. `type` is still required by the application contract. Other collection
+validators remain unchanged. Normalize canonical text before reusing/creating
+tags; the index compares exact stored category/text values.
+
+`requirementLevel` belongs only in `tor_announcements.tagAssignments[]`, alongside
+`tagId`, because a tag can be mandatory in one TOR and preferred in another. Never
+store `requirementLevel` in the canonical `tags` collection. Company links continue
+to use `verificationLevel` instead. A contractor's experience using a technology
+is a distinct concept from the technology itself: use clear distinct tag text
+and category, such as a skill/capability versus a technology specification.
+
+For the existing demo vocabulary, Node.js, MongoDB, Docker, Microservices, and Web
+Development are classified as `specification`; ISO 27001 as
+`contractor_requirement`. This describes the vocabulary, not evidence that a
+particular TOR imposes those conditions. The metadata sync preserves tag IDs,
+categories, aliases, assignments, and existing validators.
+
+TOR and company records reference tags using `tagAssignments`. TOR assignments classify a tag as `required`, `preferred`, or `informational`. Company assignments classify evidence as `claimed`, `experienced`, or `verified`. Every assignment records its source, confidence, and review status so AI suggestions cannot silently become verified facts. Exact company profile values may create/reuse active catalog terms and self-reported company links; this never creates TOR requirements. AI TOR assignments remain `suggested` until a different authorized reviewer approves them.
 
 ## 15. `ai_evaluations`
 
@@ -332,11 +361,22 @@ Stores the evaluated relationship between one company and one TOR version.
 Important fields:
 
 - `companyId`, `torId`, and `torVersion`
-- `score`: 0–100 compatibility score
-- `recommendation`: `strong_match`, `possible_match`, or `not_recommended`
-- `requirementMatches`: met, partial, or missing status with evidence
+- `resultType`: `requirement_match` for current Python comparisons
+- `score`: 0–100 requirement coverage, not an AI suitability judgment
+- `evidenceScore`: coverage weighted by company evidence strength
+- `dataMode`: `demo` or `source`
+- `recommendation`: optional legacy field; current requirement matches do not populate it
+- `requirementMatches`: met, partial, missing, informational, or unassessed status, with component clauses and profile evidence
+- `counts` and `companyCapabilities`: requirement totals and the capabilities used in the comparison
+- `status`: `compared` or `requirements_unavailable`
 - `strengths`, `gaps`, and `explanation`
+- `profileCompleteness`: optional legacy profile completion value, separate from requirement coverage
+- `policyVersion`: version of the deterministic scoring policy used
 - `computedAt`
+
+Python policy 3 compares saved company technologies and qualifications with reviewed requirements or source-validated AI requirement submissions. In `tor_software_test` only, `MATCHING_DEMO_ENABLED=true` also permits the existing version-matched `BMA-DHR-2026-001` demo requirements. These are explicitly labeled demo data, with no official-source citation asserted. The flow requires no company administrator approval or duplicate profile entry. The engine supplies a core concept vocabulary and uses active catalog aliases; it supports explicit AND/OR clauses and marks unsupported free-form requirements unassessed. Announcement titles alone are not contract requirements. The backend prepares PDF text; AI interpretation remains a separate worker.
+
+Required clauses carry weight 3, preferred clauses weight 1, and informational clauses weight 0. Coverage is separate from evidence strength: claimed (0.5), experienced (0.75), or verified (1.0). Profile text alone remains claimed. Missing requirements reduce coverage without automatically excluding a company. Zero-score comparisons are returned, and zero or unavailable results overwrite previous saved results for the same company/TOR/version. AI suitability recommendations are a separate stage; the current `/api/recommendations` endpoint reports `not_configured` until that stage is connected.
 
 ## 17. `saved_tors`
 
@@ -365,6 +405,17 @@ Important fields:
 - `title`, `message`, `createdAt`, `sentAt`, and `readAt`
 
 Workers should query queued or failed records using the `status + nextAttemptAt` index rather than repeatedly scanning all notifications.
+
+## Requirement source snapshots (`requirement_sources`)
+
+The backend stores `torId`, `torVersion`, original `sourceUrl`, resolved URL,
+SHA-256 `documentHash`, numbered page text, `fetchedAt`, and `createdAt`.
+The compound TOR/version/URL/hash index is unique. AI submissions reference a
+snapshot; quotations must exist on their cited page before requirements and
+tag links are applied. `ai_evaluations.validation` records the snapshot, source
+hash, validation method and demo/source provenance. Requirement clauses contain
+AND groups of `anyOfTagIds` alternatives. Current source/version mismatches are
+excluded from matching. See the backend AI requirements handoff for the contract.
 
 ## Feature-to-Collection Map
 

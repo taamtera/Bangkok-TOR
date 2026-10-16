@@ -34,7 +34,7 @@ export const ingestionDefinitions = {
       url: text, documentUrl: text, thumbnail: text, thumbnailSourceUrl: text,
       channelParams: { bsonType: 'object' }, itemParams: { bsonType: 'object' },
       firstSeenAt: timestamp, lastSeenAt: timestamp,
-      status: { enum: [...Object.values(STAGE_STATUS), 'multiple_announcements_same_day'] },
+      status: { enum: [...Object.values(STAGE_STATUS), 'multiple_announcements_same_day', 'unknown'] },
       statusPublishedAt: date, statusOrderAmbiguous: { bsonType: 'bool' },
       stageObservations: {
         bsonType: 'object', additionalProperties: false,

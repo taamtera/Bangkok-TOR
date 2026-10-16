@@ -5,7 +5,11 @@ import { env } from './config/env.mjs';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.mjs';
 import { requestContext } from './middleware/request-context.mjs';
 import { authRouter } from './routes/auth.routes.mjs';
+import { companyRouter } from './routes/company.routes.mjs';
 import { healthRouter } from './routes/health.routes.mjs';
+import { recommendationRouter } from './routes/recommendation.routes.mjs';
+import { matchRouter } from './routes/match.routes.mjs';
+import { aiRequirementsRouter } from './routes/ai-requirements.routes.mjs';
 import { tagRouter } from './routes/tag.routes.mjs';
 import { torRouter } from './routes/tor.routes.mjs';
 import { thumbnailRouter } from './routes/thumbnail.routes.mjs';
@@ -46,6 +50,10 @@ app.get('/api', (request, response) => {
 
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/companies', companyRouter);
+app.use('/api/recommendations', recommendationRouter);
+app.use('/api/matches', matchRouter);
+app.use('/api/ai', aiRequirementsRouter);
 app.use('/api/tags', tagRouter);
 app.use('/api/tors', torRouter);
 app.use('/api/thumbnail', thumbnailRouter);

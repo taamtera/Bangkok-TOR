@@ -54,7 +54,10 @@ export const env = Object.freeze({
     ...(process.env.NODE_ENV?.trim() === 'production' ? [] : localFrontendOrigins)
   ])],
   mongodbUri: required('MONGODB_URI'),
-  mongodbDatabaseName: process.env.MONGODB_DB_NAME?.trim() || 'tor_software'
+  mongodbDatabaseName: process.env.MONGODB_DB_NAME?.trim() || 'tor_software',
+  // Deliberate opt-in, confined to the existing test database.
+  demoMatchingEnabled: process.env.MATCHING_DEMO_ENABLED === 'true'
+    && process.env.MONGODB_DB_NAME?.trim() === 'tor_software_test'
 });
 
 const accessSecret = process.env.AUTH_ACCESS_SECRET?.trim();

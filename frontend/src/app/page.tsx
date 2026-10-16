@@ -9,8 +9,10 @@ import {
   FilterState 
 } from '@/types';
 import * as authApi from '@/lib/authApi';
+import * as companyProfileApi from '@/lib/companyProfileApi';
 import * as torApi from '@/lib/torApi';
-import { safeUserToProfile } from '@/lib/userProfile';
+import * as recommendationApi from '@/lib/aiRecommendationApi';
+import { companyDataToProfile, profileToCompanyData, safeUserToProfile } from '@/lib/userProfile';
 import { Header } from '@/components/Header';
 import { DashboardHero } from '@/components/DashboardHero';
 import { DashboardStats } from '@/components/DashboardStats';
@@ -19,7 +21,8 @@ import { TORCard } from '@/components/TORCard';
 import { TORDetailModal } from '@/components/TORDetailModal';
 import { AuthModal } from '@/components/AuthModal';
 import { SoftwareHouseProfileModal } from '@/components/SoftwareHouseProfileModal';
-import { RecommendationView } from '@/components/RecommendationView';
+import { AIRecommendationView } from '@/components/AIRecommendationView';
+import { MatchingResultsView } from '@/components/MatchingResultsView';
 import { NotificationToast } from '@/components/NotificationToast';
 import { DEFAULT_FILTERS, dateRange } from '@/lib/discovery';
 import { resolveApiUrl } from '@/lib/api';
@@ -52,12 +55,35 @@ export default function Home() {
   };
 
   // State Management
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'find' | 'recommendations' | 'profile'>('find');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'find' | 'recommendations' | 'profile' | 'matching-setup'>('find');
   const [currentUser, setCurrentUser] = useState<SoftwareHouseProfile | null>(null);
   const [contracts, setContracts] = useState<TORContract[]>([]);
   const [isLoadingTors, setIsLoadingTors] = useState(true);
   const [torLoadError, setTorLoadError] = useState<string | null>(null);
   const [torRefreshKey, setTorRefreshKey] = useState(0);
+  const [recommendations, setRecommendations] = useState<recommendationApi.RecommendationItem[]>([]);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
+  const [recommendationStatus, setRecommendationStatus] = useState<recommendationApi.RecommendationResponse['status']>('not_configured');
+
+  useEffect(() => {
+    if (activeTab !== 'recommendations' || !currentUser) return;
+    const controller = new AbortController();
+    setRecommendationLoading(true);
+    setRecommendations([]);
+    setRecommendationError(null);
+    recommendationApi.getRecommendations(controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
+      setRecommendations(result.items);
+      setRecommendationStatus(result.status);
+      setRecommendationError(null);
+    }).catch((error) => {
+      if (!controller.signal.aborted) setRecommendationError((error as Error).message);
+    }).finally(() => {
+      if (!controller.signal.aborted) setRecommendationLoading(false);
+    });
+    return () => controller.abort();
+  }, [activeTab, currentUser?.id]);
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -122,6 +148,21 @@ export default function Home() {
       cancelled = true;
     };
   }, []);
+
+  // Load persisted company fields after the account identity has been restored.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    const userId = currentUser.id;
+    companyProfileApi.getMyCompanyProfile().then((company) => {
+      if (!cancelled) {
+        setCurrentUser((user) => user?.id === userId ? companyDataToProfile(user, company) : user);
+      }
+    }).catch(() => {
+      // Keep account identity available if the company-profile service is offline.
+    });
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
   const [selectedContract, setSelectedContract] = useState<TORContract | null>(null);
   
   // Auth Modal State
@@ -134,6 +175,11 @@ export default function Home() {
   const [activeNotification, setActiveNotification] = useState<TORContract | null>(null);
   const [notificationCount] = useState<number>(0);
   const filteredContracts = contracts;
+
+  const saveCompanyProfile = async (updated: SoftwareHouseProfile) => {
+    const company = await companyProfileApi.updateMyCompanyProfile(profileToCompanyData(updated));
+    setCurrentUser((user) => user?.id === updated.id ? companyDataToProfile(updated, company) : user);
+  };
 
   // Total budget volume formatted
   const totalBudgetFormatted = useMemo(() => {
@@ -152,6 +198,7 @@ export default function Home() {
   const handleLogout = async () => {
     // Clear local state immediately; revoke the session/cookies on the backend.
     setCurrentUser(null);
+    setRecommendations([]);
     setActiveTab('dashboard');
     try {
       await authApi.logout();
@@ -331,20 +378,22 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
         {/* VIEW 3: RECOMMENDATION TAB (Desktop - data) */}
         {activeTab === 'recommendations' && (
           currentUser ? (
-            <RecommendationView
-              currentUser={currentUser}
-              contracts={contracts}
-              onSelectContract={(c) => setSelectedContract(c)}
-              onEditProfile={() => setProfileModalOpen(true)}
-              onToggleNotifications={() => {
-                setCurrentUser(prev => prev ? { ...prev, notificationsEnabled: !prev.notificationsEnabled } : null);
+            <AIRecommendationView
+              recommendations={recommendations}
+              status={recommendationStatus}
+              isLoading={recommendationLoading}
+              error={recommendationError}
+              onViewMatches={() => setActiveTab('matching-setup')}
+              onSelectProject={(projectId) => {
+                torApi.getTor(projectId).then((tor) => setSelectedContract(torApi.toTorContract(tor)))
+                  .catch((error) => setRecommendationError((error as Error).message));
               }}
             />
           ) : (
             <div className="theme-card p-10 text-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 my-8 shadow-sm">
               <Bot className="w-16 h-16 text-sky-600 dark:text-sky-400 mx-auto mb-4" />
-              <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">{t("Log in to view AI recommendations")}</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-2 mb-6">{t("Create an account or log in to assess your company qualifications and receive personalized TOR recommendations.")} </p>
+              <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">{t("Log in to view recommendations")}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-2 mb-6">{t("Log in to see AI project recommendations for your company.")} </p>
               <button
                 onClick={() => handleOpenAuth('login')}
                 className="px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-sm text-sm transition-all"
@@ -352,6 +401,13 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
             </div>
           )
         )}
+
+        {activeTab === 'matching-setup' && currentUser && <MatchingResultsView
+          currentUser={currentUser}
+          onSelectContract={(contract) => setSelectedContract(contract)}
+          onEditProfile={() => setProfileModalOpen(true)}
+          onViewRecommendations={() => setActiveTab('recommendations')}
+        />}
 
         {/* VIEW 4: PROFILE TAB (Desktop - data profile) */}
         {activeTab === 'profile' && (
@@ -372,7 +428,7 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
               </div>
 
               <div>
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">{t("Verified qualifications")} </h3>
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">{t("Company qualifications")} </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {currentUser.properties.map((prop, idx) => (
                     <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-200 flex items-center gap-2">
@@ -424,7 +480,7 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
           isOpen={profileModalOpen}
           onClose={() => setProfileModalOpen(false)}
           currentUser={currentUser}
-          onSave={(updated) => setCurrentUser(updated)}
+          onSave={saveCompanyProfile}
         />
       )}
 

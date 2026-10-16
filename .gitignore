@@ -39,6 +39,9 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+__pycache__/
+*.pyc
+tag-catalog-backups/
 next-env.d.ts
 
 # Vercel

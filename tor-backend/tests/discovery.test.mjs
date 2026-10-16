@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDiscoveryQuery } from '../src/repositories/tor-query.mjs';
+import { buildDiscoveryQuery, VALID_PROJECT_ID_FILTER } from '../src/repositories/tor-query.mjs';
+
+test('discovery excludes records without a non-blank string project identity', () => {
+  assert.deepEqual(buildDiscoveryQuery().filter.projectId, VALID_PROJECT_ID_FILTER.projectId);
+  assert.deepEqual(VALID_PROJECT_ID_FILTER.projectId, { $type: 'string', $regex: /\S/ });
+});
 
 test('search requires each literal word across project and department fields', () => {
   const query = buildDiscoveryQuery({ search: '  software   0001 .*  ', departmentId: '0001' });

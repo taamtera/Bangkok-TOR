@@ -79,6 +79,8 @@ export interface TORContract extends Partial<ProjectFields> {
 
 export interface SoftwareHouseProfile {
   id: string;
+  companyId?: string | null;
+  role?: string;
   name: string;
   email: string;
   companyName: string;

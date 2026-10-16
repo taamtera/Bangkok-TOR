@@ -35,6 +35,11 @@ export function getDatabase() {
   return database;
 }
 
+export function startDatabaseSession() {
+  if (!client) throw new Error('Database connection has not been initialized.');
+  return client.startSession();
+}
+
 export async function closeDatabase() {
   if (client) {
     await client.close();

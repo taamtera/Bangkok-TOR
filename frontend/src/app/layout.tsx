@@ -1,12 +1,6 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from '@/lib/LanguageProvider';
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
 
 export const metadata: Metadata = {
   title: "Thailand TOR Intelligence - Software House Matcher & AI Evaluator",
@@ -21,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className={`${inter.variable}`}>
+    <html lang="th">
       <body className="antialiased min-h-screen">
         <LanguageProvider>{children}</LanguageProvider>
       </body>

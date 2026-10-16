@@ -37,6 +37,7 @@ function normalizeObservation(document) {
   const observation = Object.fromEntries(observationFields.filter(field => document[field] !== undefined).map(field => [field, iso(document[field])]));
   observation.publishedAt = publicationDate(document.publishedAt);
   observation.itemParams = { ...(document.itemParams || {}) };
+  if (document.announcementType !== undefined && observation.itemParams.announcementType === undefined) observation.itemParams.announcementType = document.announcementType;
   // Retain raw document IDs in their parameter bag before removing top-level fields.
   if (document.templateId && !observation.itemParams.templateId) observation.itemParams.templateId = document.templateId;
   return observation;
@@ -49,7 +50,7 @@ export function planProjectMigration(announcements, thumbnails) {
   const templateProjects = new Map();
   for (const original of announcements) {
     try {
-      const document = { ...original, projectId: sourceString(original.projectId ?? original.itemParams?.planId ?? original.itemParams?.projectId ?? linkedId(original)) };
+      const document = { ...original, projectId: sourceString(original.projectId ?? original.itemParams?.planId ?? original.itemParams?.projectId ?? linkedId(original) ?? original.externalId) };
       if (!document.projectId) throw new Error('No reliable projectId; projectKey is not a source identity');
       if (document.departmentId != null && typeof document.departmentId !== 'string') throw new Error('departmentId must be restored as a source string to preserve leading zeros');
       for (const field of ['firstSeenAt', 'lastSeenAt']) {
@@ -67,7 +68,6 @@ export function planProjectMigration(announcements, thumbnails) {
         const current = normalizeObservation(document);
         if (!observations[code] || compareObservations(current, observations[code]) > 0) observations[code] = current;
       }
-      if (!Object.keys(observations).length) throw new Error('No reliable stage code; restore raw request/item parameters');
       document.stageObservations = observations;
       groups.set(document.projectId, [...(groups.get(document.projectId) || []), document]);
       const templateId = original.templateId ?? original.itemParams?.templateId;
@@ -91,7 +91,7 @@ export function planProjectMigration(announcements, thumbnails) {
         if (!observations[code] || compareObservations(observation, observations[code]) > 0) observations[code] = observation;
       }
     }
-    const statusPublishedAt = Object.values(observations).map(value => value.publishedAt).sort().at(-1);
+    const statusPublishedAt = Object.values(observations).map(value => value.publishedAt).sort().at(-1) || publicationDate(latest.publishedAt);
     const latestCodes = Object.keys(observations).filter(code => observations[code].publishedAt === statusPublishedAt);
     const project = {
       ...latest, _id: survivor._id, projectId,
@@ -102,7 +102,7 @@ export function planProjectMigration(announcements, thumbnails) {
       linkedProjectId: latest.linkedProjectId ?? linkedId(latest),
       stageObservations: observations, statusPublishedAt,
       statusOrderAmbiguous: latestCodes.length > 1,
-      status: latestCodes.length > 1 ? 'multiple_announcements_same_day' : STAGE_STATUS[latestCodes[0]],
+      status: latestCodes.length > 1 ? 'multiple_announcements_same_day' : STAGE_STATUS[latestCodes[0]] || 'unknown',
       biddingOpenVerified: false, titleMatchedKeywords: latest.titleMatchedKeywords ?? [],
       itemParams: normalizeObservation(latest).itemParams, channelParams: latest.channelParams ?? {},
       thumbnail: `/api/thumbnail/${encodeURIComponent(projectId)}`,
@@ -114,6 +114,11 @@ export function planProjectMigration(announcements, thumbnails) {
     delete project.templateId;
     delete project.projectKey;
     delete project.announcementType;
+    delete project.externalId;
+    delete project.dedupKey;
+    delete project.documents;
+    delete project.organization;
+    delete project.sourceUrl;
     projects.push(project);
     removedAnnouncementIds.push(...documents.filter(value => String(value._id) !== String(survivor._id)).map(value => value._id));
   }

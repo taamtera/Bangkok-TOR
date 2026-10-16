@@ -15,8 +15,8 @@ import {
 import { SoftwareHouseProfile } from '@/types';
 
 interface HeaderProps {
-  activeTab: 'dashboard' | 'find' | 'recommendations' | 'profile';
-  setActiveTab: (tab: 'dashboard' | 'find' | 'recommendations' | 'profile') => void;
+  activeTab: 'dashboard' | 'find' | 'recommendations' | 'profile' | 'matching-setup';
+  setActiveTab: (tab: 'dashboard' | 'find' | 'recommendations' | 'profile' | 'matching-setup') => void;
   currentUser: SoftwareHouseProfile | null;
   onOpenAuth: (mode: 'login' | 'signin') => void;
   onLogout: () => void;
@@ -109,6 +109,20 @@ export const Header: React.FC<HeaderProps> = ({
             <span>{t("Find TORs")}</span>
           </button>
 
+          {currentUser && (
+            <button
+              onClick={() => setActiveTab('matching-setup')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
+                activeTab === 'matching-setup'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-slate-700'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>{t('Matching results')}</span>
+            </button>
+          )}
+
           <button
             onClick={() => setActiveTab('recommendations')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all relative ${
@@ -118,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Layers className="w-4 h-4" />
-            <span>{t("Recommendation")}</span>
+            <span>{t("AI recommendations")}</span>
             {notificationCount > 0 && (
               <span className="ml-1 px-1.5 py-0.2 text-[10px] font-bold bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-800 rounded-full">
                 {notificationCount}

@@ -261,6 +261,16 @@ const collectionDefinitions = {
       updatedAt: { bsonType: 'date' }
     }
   },
+  requirement_sources: {
+    required: ['torId', 'torVersion', 'sourceUrl', 'documentHash', 'pages', 'fetchedAt', 'createdAt'],
+    properties: {
+      torId: { bsonType: 'objectId' }, torVersion: { bsonType: ['int', 'long'], minimum: 1 },
+      sourceUrl: { bsonType: 'string' }, documentHash: { bsonType: 'string', pattern: '^[a-f0-9]{64}$' },
+      pages: { bsonType: 'array', maxItems: 200, items: { bsonType: 'object', required: ['page', 'text'],
+        properties: { page: { bsonType: ['int', 'long'], minimum: 1 }, text: { bsonType: 'string' } } } },
+      fetchedAt: { bsonType: 'date' }, createdAt: { bsonType: 'date' }
+    }
+  },
   ai_evaluations: {
     required: ['torId', 'torVersion', 'status', 'retryCount', 'lastAttemptAt', 'nextAttemptAt', 'lastError', 'requirements', 'model', 'createdAt', 'updatedAt'],
     properties: {
@@ -290,17 +300,27 @@ const collectionDefinitions = {
     }
   },
   company_matches: {
-    required: ['companyId', 'torId', 'torVersion', 'score', 'recommendation', 'requirementMatches', 'computedAt', 'createdAt', 'updatedAt'],
+    required: ['companyId', 'torId', 'torVersion', 'score', 'requirementMatches', 'computedAt', 'createdAt', 'updatedAt'],
     properties: {
       companyId: { bsonType: 'objectId' },
       torId: { bsonType: 'objectId' },
       torVersion: { bsonType: ['int', 'long'], minimum: 1 },
       score: { bsonType: ['int', 'long', 'double'], minimum: 0, maximum: 100 },
+      // Retained for old records only. New Python results contain requirement
+      // coverage; AI suitability recommendations are a separate stage.
       recommendation: { enum: ['strong_match', 'possible_match', 'not_recommended'] },
+      resultType: { enum: ['requirement_match'] },
+      dataMode: { enum: ['demo', 'source'] },
+      evidenceScore: { bsonType: ['int', 'long', 'double'], minimum: 0, maximum: 100 },
+      status: { enum: ['compared', 'requirements_unavailable'] },
+      counts: { bsonType: 'object' },
+      companyCapabilities: { bsonType: 'array', items: { bsonType: 'object' } },
       requirementMatches: { bsonType: 'array', items: { bsonType: 'object' } },
       strengths: { bsonType: 'array', items: { bsonType: 'string' } },
       gaps: { bsonType: 'array', items: { bsonType: 'string' } },
       explanation: { bsonType: ['string', 'null'] },
+      profileCompleteness: { bsonType: ['int', 'long', 'double'], minimum: 0, maximum: 100 },
+      policyVersion: { bsonType: ['int', 'long'], minimum: 1 },
       computedAt: { bsonType: 'date' },
       createdAt: { bsonType: 'date' },
       updatedAt: { bsonType: 'date' }
@@ -413,6 +433,9 @@ const indexes = {
     [{ category: 1, text: 1 }, { unique: true, name: 'uq_tags_category_text' }],
     [{ category: 1, status: 1, name: 1 }, { name: 'ix_tags_category_status_name' }],
     [{ aliases: 1 }, { name: 'ix_tags_aliases' }]
+  ],
+  requirement_sources: [
+    [{ torId: 1, torVersion: 1, sourceUrl: 1, documentHash: 1 }, { unique: true, name: 'uq_requirement_source' }]
   ],
   ai_evaluations: [
     [{ torId: 1, torVersion: 1 }, { unique: true, name: 'uq_ai_tor_version' }],

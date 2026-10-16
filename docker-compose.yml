@@ -8,9 +8,10 @@ services:
     env_file:
       - ./tor-backend/.env
     environment:
-      FRONTEND_ORIGIN: http://localhost:3000
+      FRONTEND_ORIGIN: http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001
       NODE_ENV: production
       PORT: 4000
+      MATCHING_DEMO_ENABLED: "true"
     ports:
       - "4000:4000"
     restart: unless-stopped

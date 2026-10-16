@@ -2,13 +2,14 @@ import { getDatabase } from '../config/database.mjs';
 import { createHash } from 'node:crypto';
 import { httpError } from '../utils/http-error.mjs';
 import { toObjectId } from '../utils/object-id.mjs';
+import { coreTagForName, normalizeTagName, isFlaggedTagName } from '../services/tag-catalog.mjs';
 
 function tags() {
   return getDatabase().collection('tags');
 }
 
 function normalizeName(value) {
-  return value.trim().toLocaleLowerCase('en-US').replace(/\s+/gu, ' ');
+  return normalizeTagName(value);
 }
 
 function slugify(value) {
@@ -17,6 +18,10 @@ function slugify(value) {
     .toLocaleLowerCase('en-US')
     .replace(/[^a-z0-9]+/gu, '-')
     .replace(/^-+|-+$/gu, '');
+}
+
+function profileTagSlug(name, category) {
+  return `${slugify(name) || 'profile'}-${category}`;
 }
 
 function escapeRegex(value) {
@@ -71,6 +76,102 @@ export async function createControlledTag({ name, category, type, aliases = [], 
   };
   const result = await tags().insertOne(document);
   return { ...document, _id: result.insertedId };
+}
+
+// Company-entered profile values are self-reported claims. Turn those exact
+// values into reusable catalog entries so companies can use matching without
+// waiting for an administrator to create each capability tag. This does not
+// create or approve TOR requirements.
+export async function findOrCreateProfileTag({ name, category }) {
+  if (isFlaggedTagName(name)) return null;
+  const core = coreTagForName(name, { profile: true });
+  name = core?.name || name;
+  category = core?.category || category;
+  const cleanName = name.trim();
+  const normalizedName = normalizeName(cleanName);
+  const existing = await tags().findOne({ category, normalizedName });
+  if (existing) return existing.status === 'active' ? existing : null;
+
+  const now = new Date();
+  const document = {
+    name: cleanName,
+    normalizedName,
+    slug: profileTagSlug(cleanName, category),
+    category,
+    aliases: core?.aliases || [],
+    ...(core ? { conceptKey: core.conceptKey } : {}),
+    description: 'Self-reported company profile capability; not independently verified.',
+    status: 'active',
+    createdByUserId: null,
+    createdAt: now,
+    updatedAt: now
+  };
+
+  try {
+    const result = await tags().insertOne(document);
+    return { ...document, _id: result.insertedId };
+  } catch (error) {
+    // Concurrent profile saves can create the same canonical tag. Re-read the
+    // winning entry rather than failing the profile save.
+    if (error?.code === 11000) {
+      const raced = await tags().findOne({ category, normalizedName });
+      if (raced) return raced.status === 'active' ? raced : null;
+      document.slug = `${profileTagSlug(cleanName, category)}-${createHash('sha256').update(normalizedName).digest('hex').slice(0, 8)}`;
+      const result = await tags().insertOne(document);
+      return { ...document, _id: result.insertedId };
+    }
+    throw error;
+  }
+}
+
+export async function findControlledTagById(tagId) {
+  return tags().findOne({ _id: toObjectId(tagId, 'tagId') });
+}
+
+export async function updateControlledTag(tagId, updates) {
+  const objectId = toObjectId(tagId, 'tagId');
+  const current = await tags().findOne({ _id: objectId });
+  if (!current) {
+    throw httpError(404, 'TAG_NOT_FOUND', 'The tag does not exist.');
+  }
+
+  const name = updates.name ?? current.name;
+  const category = updates.category ?? current.category;
+  const normalizedName = normalizeName(name);
+  const normalizedNameChanged = normalizedName !== current.normalizedName || category !== current.category;
+
+  if (normalizedNameChanged) {
+    const duplicate = await tags().findOne({
+      _id: { $ne: objectId },
+      category,
+      normalizedName
+    });
+    if (duplicate) {
+      throw httpError(409, 'TAG_ALREADY_EXISTS', 'A tag with this name already exists in this category.');
+    }
+  }
+
+  const fields = { ...updates, updatedAt: new Date() };
+  if (Object.hasOwn(updates, 'name') || Object.hasOwn(updates, 'category')) {
+    fields.normalizedName = normalizedName;
+  }
+
+  try {
+    return await tags().findOneAndUpdate(
+      { _id: objectId },
+      { $set: fields },
+      { returnDocument: 'after' }
+    );
+  } catch (error) {
+    if (error?.code === 11000) {
+      throw httpError(409, 'TAG_ALREADY_EXISTS', 'A tag with this name or slug already exists.');
+    }
+    throw error;
+  }
+}
+
+export async function deactivateControlledTag(tagId) {
+  return updateControlledTag(tagId, { status: 'inactive' });
 }
 
 export async function assertActiveTagIds(tagIds) {

@@ -3,6 +3,7 @@
 // No token is ever read or stored in JS — the browser holds them as httpOnly cookies.
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+let refreshInFlight: Promise<boolean> | null = null;
 
 export interface SafeUser {
   id: string;
@@ -113,5 +114,38 @@ export function me(): Promise<{ user: SafeUser }> {
 // Soft "am I logged in?" check for page load. Always resolves 200 — returns
 // { user: null } when not signed in — so it never logs a console 401.
 export function getSession(): Promise<{ user: SafeUser | null }> {
-  return request('/session', { method: 'GET' });
+  return request<{ user: SafeUser | null }>('/session', { method: 'GET' }).then(async (session) => {
+    if (session.user) return session;
+    try {
+      // Access tokens expire after a short period. A valid refresh cookie can
+      // restore the session after a page reload without asking the user to log in.
+      const refreshed = await request<{ user: SafeUser }>('/refresh', { body: '{}' });
+      return { user: refreshed.user };
+    } catch {
+      return session;
+    }
+  });
+}
+
+/** Fetch a protected API resource, refreshing the short-lived access cookie once on 401. */
+export async function fetchWithSessionRefresh(endpoint: string, options: RequestInit = {}) {
+  const fetchOptions: RequestInit = { ...options, credentials: 'include' };
+  const response = await fetch(endpoint, fetchOptions);
+  if (response.status !== 401 || options.signal?.aborted) return response;
+
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    }).then((refreshResponse) => refreshResponse.ok).catch(() => false).finally(() => {
+      refreshInFlight = null;
+    });
+  }
+
+  const refreshed = await refreshInFlight;
+  if (!refreshed || options.signal?.aborted) return response;
+  return fetch(endpoint, fetchOptions);
 }

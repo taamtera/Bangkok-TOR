@@ -7,6 +7,9 @@ export const STAGE_STATUS = {
 };
 const SEARCH_FIELDS = ['projectId', 'title', 'description', 'departmentId', 'departmentName'];
 const escapeRegex = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export const VALID_PROJECT_ID_FILTER = Object.freeze({
+  projectId: Object.freeze({ $type: 'string', $regex: /\S/ })
+});
 export const METHOD_VALUE = { $cond: [
   { $eq: [{ $type: '$procurementMethod' }, 'string'] }, '$procurementMethod',
   { $ifNull: ['$procurementMethod.name', { $ifNull: ['$procurementMethod.label', { $ifNull: ['$procurementMethod.code', '$procurementMethod.id'] }] }] }
@@ -69,7 +72,10 @@ export function buildDiscoveryQuery(options = {}) {
     ])
   ] } : null;
   return {
-    filter: conditions.length ? { $and: conditions } : {},
+    filter: {
+      ...VALID_PROJECT_ID_FILTER,
+      ...(conditions.length ? { $and: conditions } : {})
+    },
     ranking: search && sort === 'relevance' ? ranking : null,
     sort: search && sort === 'relevance' ? { _searchRank: -1, statusPublishedAt: -1, projectId: 1 }
       : { statusPublishedAt: sort === 'oldest' ? 1 : -1, projectId: 1 }

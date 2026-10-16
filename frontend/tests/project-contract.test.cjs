@@ -72,3 +72,16 @@ test('project discovery requests only the selected page and preserves query stri
     assert.equal(new URL(pages[0]).searchParams.get('departmentId'), '0001');
   } finally { global.fetch = originalFetch; }
 });
+
+test('project discovery skips records with invalid IDs instead of failing the entire page', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({ ok: true, json: async () => ({
+    items: [{ projectId: null }, { projectId: '   ' }, { projectId: '00042' }],
+    pagination: { total: 3, totalPages: 1 }
+  }) });
+  try {
+    const result = await api.listTors();
+    assert.deepEqual(result.items.map(project => project.projectId), ['00042']);
+    assert.equal(result.total, 3);
+  } finally { global.fetch = originalFetch; }
+});

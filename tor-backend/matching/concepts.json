@@ -1,0 +1,14 @@
+{
+  "iso-27001": {"name": "ISO/IEC 27001", "aliases": ["ISO 27001", "ISO/IEC 27001", "ISO-27001", "ISO27001", "ISO/IEC27001"]},
+  "ehr": {"name": "Electronic health record systems", "aliases": ["EHR", "electronic health record", "electronic health records"]},
+  "large-scale-data": {"name": "Large-scale data management", "aliases": ["large-scale data management", "large scale data management", "enterprise data platform", "big data platform"]},
+  "hospital-system": {"name": "Hospital information systems", "aliases": ["hospital information system", "hospital information systems", "hospital system", "hospital systems", "ระบบสารสนเทศโรงพยาบาล"]},
+  "microservices": {"name": "Microservices architecture", "aliases": ["microservices", "microservice architecture", "microservices architecture", "microservice-based architecture"]},
+  "docker": {"name": "Docker", "aliases": ["Docker"]},
+  "kubernetes": {"name": "Kubernetes", "aliases": ["Kubernetes", "K8s"]},
+  "gis": {"name": "GIS", "aliases": ["GIS", "geographic information system", "geographical information system", "ระบบสารสนเทศภูมิศาสตร์"]},
+  "web-development": {"name": "Web application development", "aliases": ["web application development", "web app development", "web development", "web developer", "full-stack web development", "full stack developer", "full-stack developer", "develop a web app"]},
+  "backend": {"name": "Backend/API development", "aliases": ["backend developer", "backend development", "backend/API development", "API development"]},
+  "end-to-end": {"name": "End-to-end application development", "aliases": ["end-to-end application development", "end-to-end app", "end to end app"]},
+  "government-system": {"name": "Government system development", "aliases": ["government system development", "government systems", "governments system", "governments systems"]}
+}

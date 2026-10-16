@@ -15,6 +15,15 @@ function responseRecorder() {
 
 const removedFields = ['opend', 'opendLookup', 'province', 'district', 'subdistrict', 'projectLocation', 'projectMoney', 'referencePrice', 'totalContractValue', 'contractProjectStatus', 'contracts', 'opendUpdatedAt', 'locationFilter'];
 
+test('public TOR serialization excludes pending and rejected AI requirement suggestions', () => {
+  const result = serializeTor({ projectId: '123', tagAssignments: [
+    { tagId: 'approved', reviewStatus: 'approved', source: 'manual' },
+    { tagId: 'pending', reviewStatus: 'suggested', source: 'ai' },
+    { tagId: 'rejected', reviewStatus: 'rejected', source: 'ai' }
+  ] });
+  assert.deepEqual(result.tagAssignments.map(({ tagId }) => tagId), ['approved']);
+});
+
 test('serialization keeps project identity and RSS stages while omitting all removed fields', () => {
   const legacy = Object.fromEntries(removedFields.map(field => [field, { stale: 'data' }]));
   const result = serializeTor({ ...legacy, _id: 'internal', projectId: 'P69100015073', departmentId: '0001',

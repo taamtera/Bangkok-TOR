@@ -9,9 +9,12 @@ FROM node:24.20.0-alpine3.24 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
+RUN apk add --no-cache python3
+
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY src ./src
+COPY matching ./matching
 
 USER node
 EXPOSE 4000

@@ -110,7 +110,24 @@ test('RSS stage metadata stays distinct from raw document templateType', () => {
   assert.equal(result.projects[0].itemParams.templateType, 'D2');
   assert.equal(result.projects[0].stageObservations.D0.itemParams.templateType, 'D2');
   const unknown = planProjectMigration([announcement({ announcementType: null, itemParams: { templateType: 'D2' } })], []);
-  assert.equal(unknown.errors.length, 1);
+  assert.equal(unknown.errors.length, 0);
+  assert.equal(unknown.projects[0].status, 'unknown');
+});
+
+test('migration preserves a legacy non-RSS TOR using its source externalId and an unknown stage', () => {
+  const legacy = announcement({
+    _id: 'legacy-id', projectId: null, externalId: 'BMA-DHR-2026-001',
+    announcementType: { code: 'TOR', nameTh: 'ร่างขอบเขตของงาน' }, status: 'open',
+    stageObservations: undefined
+  });
+  const result = planProjectMigration([legacy], []);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.projects.length, 1);
+  assert.equal(result.projects[0]._id, 'legacy-id');
+  assert.equal(result.projects[0].projectId, 'BMA-DHR-2026-001');
+  assert.equal(result.projects[0].status, 'unknown');
+  assert.deepEqual(result.projects[0].stageObservations, {});
+  assert.equal(result.projects[0].statusPublishedAt, '2026-10-01');
 });
 
 test('schemas and full unique indexes use projectId, with retired fields forbidden', () => {
