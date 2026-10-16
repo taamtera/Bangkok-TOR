@@ -31,7 +31,8 @@ export function validateAiRequirements(body, source) {
         const name = text(tag?.name, 'tag name', 120);
         if (name.length < 3 || !TAG_CATEGORIES.includes(tag?.category) || isFlaggedTagName(name)) invalid('A new tag needs a valid name and category.');
         if (!phraseInText(quote, name)) invalid('A new tag name must appear in the cited quotation.', 'AI_TAG_EVIDENCE_MISMATCH');
-        return { name, category: tag.category };
+        const contractorLabel = tag.contractorLabel == null ? null : text(tag.contractorLabel, 'contractorLabel', 200);
+        return { name, category: tag.category, ...(contractorLabel ? { contractorLabel } : {}) };
       }) };
     });
     return { key, text: requirementText, importance: item.importance, confidence: item.confidence, evidence: { page, quote }, clauses };

@@ -1,4 +1,11 @@
 {
+  "Contractor services": "บริการของผู้รับจ้าง",
+  "Contractor label unavailable": "ยังไม่มีชื่อประเภทผู้รับจ้าง",
+  "Remove contractor service": "นำบริการของผู้รับจ้างออก",
+  "No contractor services selected.": "ยังไม่ได้เลือกบริการของผู้รับจ้าง",
+  "Select contractor service": "เลือกบริการของผู้รับจ้าง",
+  "Add contractor service": "เพิ่มบริการของผู้รับจ้าง",
+  "Could not load contractor services.": "ไม่สามารถโหลดบริการของผู้รับจ้างได้",
   "Status:": "สถานะ:",
   "Published:": "เผยแพร่:",
   "Procurement Method": "วิธีจัดซื้อจัดจ้าง",

@@ -1,4 +1,4 @@
-import { findCompanyById, syncCompanyProfileTagAssignments, updateCompanyProfile } from '../repositories/company.repository.mjs';
+import { findCompanyProfileById, syncCompanyProfileTagAssignments, updateCompanyProfile } from '../repositories/company.repository.mjs';
 import { toCompanyProfile } from '../serializers/company.serializer.mjs';
 import { refreshCompanyRequirementMatches } from '../services/requirement-matching.service.mjs';
 import { httpError } from '../utils/http-error.mjs';
@@ -17,7 +17,7 @@ async function refreshAfterSave(companyId) {
 }
 
 export async function getMyProfile(request, response) {
-  const company = await findCompanyById(companyIdOf(request));
+  const company = await findCompanyProfileById(companyIdOf(request));
   if (!company) throw httpError(404, 'COMPANY_NOT_FOUND', 'The linked company profile does not exist.');
   response.json({ company: toCompanyProfile(company) });
 }
@@ -29,7 +29,7 @@ export async function updateMyProfile(request, response) {
   if (!company) throw httpError(404, 'COMPANY_NOT_FOUND', 'The linked company profile does not exist.');
   await syncCompanyProfileTagAssignments(companyId);
   await refreshAfterSave(companyId);
-  response.json({ company: toCompanyProfile(company) });
+  response.json({ company: toCompanyProfile(await findCompanyProfileById(companyId)) });
 }
 
 export async function syncMyMatchingTags(request, response) {

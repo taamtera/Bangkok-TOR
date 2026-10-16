@@ -1,11 +1,14 @@
 const REMOVED_ENRICHMENT_FIELDS = ['opend', 'opendLookup', 'province', 'district', 'subdistrict', 'projectLocation', 'projectMoney', 'referencePrice', 'totalContractValue', 'contractProjectStatus', 'contracts', 'opendUpdatedAt', 'locationFilter'];
 
+import { normalizeTorDocuments } from '../models/tor-document.mjs';
+
 // Source identities are strings; MongoDB _id remains internal.
 export function serializeTor(tor) {
   const { _id, templateId, projectKey, announcementType, ...project } = tor;
   const projectId = typeof tor.projectId === 'string' ? tor.projectId : null;
   const result = {
     ...project, projectId,
+    documents: normalizeTorDocuments(tor.documents ?? []),
     // Expose reviewed annotations and exact, source-cited announcement mentions
     // used by automatic recommendation candidates. Pending AI suggestions stay private.
     tagAssignments: Array.isArray(tor.tagAssignments)

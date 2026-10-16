@@ -20,7 +20,8 @@ export function planCatalogCleanup(tags) {
     let slug = tag.slug || `tag-${tag._id}`;
     if (usedSlugs.has(slug)) slug = `${slug}-${tag._id}`; usedSlugs.add(slug);
     const flagged = isFlaggedTagName(tag.name);
-    return { ...tag, normalizedName: normalizeTagName(tag.name), slug,
+    return { ...tag, text: tag.text ?? tag.name, normalizedName: normalizeTagName(tag.name), slug,
+      contractorLabel: tag.contractorLabel ?? group.find((item) => item.contractorLabel)?.contractorLabel ?? null,
       aliases: [...new Set(group.flatMap((item) => item.aliases || []))],
       ...(flagged ? { status: 'inactive', matchingExcluded: true, qualityIssue: 'Possible ISO 27001 typo; original profile text is preserved.' } : {}) };
   });
@@ -60,7 +61,7 @@ export async function migrateCatalog(db, { apply = false } = {}) {
         const normalizedName = normalizeTagName(tag.name); const now = new Date();
         await db.collection('tags').updateOne({ category: tag.category, normalizedName }, {
           $set: { conceptKey: tag.conceptKey, updatedAt: now }, $addToSet: { aliases: { $each: tag.aliases } },
-          $setOnInsert: { name: tag.name, normalizedName, category: tag.category, status: 'active',
+          $setOnInsert: { name: tag.name, text: tag.name, normalizedName, category: tag.category, contractorLabel: null, status: 'active',
             slug: `shared-${createHash('sha256').update(`${tag.category}:${normalizedName}`).digest('hex').slice(0, 20)}`,
             description: 'Shared matching concept; assignment evidence remains separate.', createdAt: now, createdByUserId: null }
         }, { session, upsert: true });

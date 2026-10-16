@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { httpError } from '../utils/http-error.mjs';
 import { toObjectId } from '../utils/object-id.mjs';
 import { coreTagForName, normalizeTagName, isFlaggedTagName } from '../services/tag-catalog.mjs';
+import { serializeTag } from '../serializers/tag.serializer.mjs';
 
 function tags() {
   return getDatabase().collection('tags');
@@ -41,13 +42,13 @@ export async function listControlledTags({ category = null, search = null, statu
 
   if (search?.trim()) {
     const expression = new RegExp(escapeRegex(search.trim()), 'iu');
-    filter.$or = [{ name: expression }, { text: expression }, { aliases: expression }];
+    filter.$or = [{ name: expression }, { text: expression }, { contractorLabel: expression }, { aliases: expression }];
   }
 
-  return tags().find(filter).sort({ category: 1, name: 1 }).toArray();
+  return (await tags().find(filter).sort({ category: 1, name: 1 }).toArray()).map(serializeTag);
 }
 
-export async function createControlledTag({ name, category, type, aliases = [], description = null, createdByUserId }) {
+export async function createControlledTag({ name, category, type, contractorLabel = null, aliases = [], description = null, createdByUserId }) {
   const normalizedName = normalizeName(name);
   const readableSlug = slugify(name);
   const slug = readableSlug || `${category}-${createHash('sha256').update(normalizedName).digest('hex').slice(0, 12)}`;
@@ -67,6 +68,7 @@ export async function createControlledTag({ name, category, type, aliases = [], 
     slug,
     category,
     type,
+    contractorLabel: contractorLabel?.trim() || null,
     aliases: [...new Set(aliases.map((alias) => alias.trim()).filter(Boolean))],
     description: description?.trim() || null,
     status: 'active',
@@ -82,19 +84,22 @@ export async function createControlledTag({ name, category, type, aliases = [], 
 // values into reusable catalog entries so companies can use matching without
 // waiting for an administrator to create each capability tag. This does not
 // create or approve TOR requirements.
-export async function findOrCreateProfileTag({ name, category }) {
+export async function findOrCreateProfileTag({ name, category, contractorLabel = null }) {
   if (isFlaggedTagName(name)) return null;
   const core = coreTagForName(name, { profile: true });
   name = core?.name || name;
   category = core?.category || category;
   const cleanName = name.trim();
   const normalizedName = normalizeName(cleanName);
-  const existing = await tags().findOne({ category, normalizedName });
-  if (existing) return existing.status === 'active' ? existing : null;
+  const lookup = { category, $or: [{ normalizedName }, { text: cleanName }, { name: cleanName }] };
+  const existing = await tags().findOne(lookup);
+  if (existing) return existing.status !== 'inactive' ? serializeTag(existing) : null;
 
   const now = new Date();
   const document = {
     name: cleanName,
+    text: cleanName,
+    contractorLabel: contractorLabel?.trim() || null,
     normalizedName,
     slug: profileTagSlug(cleanName, category),
     category,
@@ -114,8 +119,8 @@ export async function findOrCreateProfileTag({ name, category }) {
     // Concurrent profile saves can create the same canonical tag. Re-read the
     // winning entry rather than failing the profile save.
     if (error?.code === 11000) {
-      const raced = await tags().findOne({ category, normalizedName });
-      if (raced) return raced.status === 'active' ? raced : null;
+      const raced = await tags().findOne(lookup);
+      if (raced) return raced.status !== 'inactive' ? serializeTag(raced) : null;
       document.slug = `${profileTagSlug(cleanName, category)}-${createHash('sha256').update(normalizedName).digest('hex').slice(0, 8)}`;
       const result = await tags().insertOne(document);
       return { ...document, _id: result.insertedId };
@@ -125,7 +130,7 @@ export async function findOrCreateProfileTag({ name, category }) {
 }
 
 export async function findControlledTagById(tagId) {
-  return tags().findOne({ _id: toObjectId(tagId, 'tagId') });
+  return serializeTag(await tags().findOne({ _id: toObjectId(tagId, 'tagId') }));
 }
 
 export async function updateControlledTag(tagId, updates) {
@@ -135,10 +140,11 @@ export async function updateControlledTag(tagId, updates) {
     throw httpError(404, 'TAG_NOT_FOUND', 'The tag does not exist.');
   }
 
-  const name = updates.name ?? current.name;
+  const name = updates.name ?? current.name ?? current.text;
   const category = updates.category ?? current.category;
   const normalizedName = normalizeName(name);
-  const normalizedNameChanged = normalizedName !== current.normalizedName || category !== current.category;
+  const normalizedNameChanged = (Object.hasOwn(updates, 'name') || Object.hasOwn(updates, 'category'))
+    && (normalizedName !== current.normalizedName || category !== current.category);
 
   if (normalizedNameChanged) {
     const duplicate = await tags().findOne({
@@ -152,16 +158,17 @@ export async function updateControlledTag(tagId, updates) {
   }
 
   const fields = { ...updates, updatedAt: new Date() };
+  if (Object.hasOwn(updates, 'name')) fields.text = name;
   if (Object.hasOwn(updates, 'name') || Object.hasOwn(updates, 'category')) {
     fields.normalizedName = normalizedName;
   }
 
   try {
-    return await tags().findOneAndUpdate(
+    return serializeTag(await tags().findOneAndUpdate(
       { _id: objectId },
       { $set: fields },
       { returnDocument: 'after' }
-    );
+    ));
   } catch (error) {
     if (error?.code === 11000) {
       throw httpError(409, 'TAG_ALREADY_EXISTS', 'A tag with this name or slug already exists.');

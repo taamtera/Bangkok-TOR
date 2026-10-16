@@ -27,6 +27,7 @@ export async function createCompany({
     district: district ?? null,
     technologies: [],
     qualifications: [],
+    tags: [],
     verificationStatus: 'unverified',
     createdByUserId: createdByUserId ? toObjectId(createdByUserId, 'createdByUserId') : null,
     memberCount: 1,
@@ -49,10 +50,38 @@ export async function findCompanyById(companyId) {
   return companies().findOne({ _id: toObjectId(companyId, 'companyId') });
 }
 
+export async function findCompanyProfileById(companyId) {
+  const [company] = await companies().aggregate([
+    { $match: { _id: toObjectId(companyId, 'companyId') } },
+    { $lookup: { from: 'tags', localField: 'tags.tagId', foreignField: '_id', as: 'catalogTags' } },
+    { $set: { tags: { $map: {
+      input: { $ifNull: ['$tags', []] }, as: 'link',
+      in: { $let: {
+        vars: { tag: { $arrayElemAt: [{ $filter: { input: '$catalogTags', as: 'entry', cond: { $eq: ['$$entry._id', '$$link.tagId'] } } }, 0] } },
+        in: { tagId: '$$link.tagId', contractorLabel: { $ifNull: ['$$tag.contractorLabel', null] },
+          text: { $ifNull: ['$$tag.text', { $ifNull: ['$$tag.name', null] }] },
+          category: { $ifNull: ['$$tag.category', null] }, type: { $ifNull: ['$$tag.type', null] }, status: { $ifNull: ['$$tag.status', null] } }
+      } }
+    } } } },
+    { $unset: 'catalogTags' }
+  ]).toArray();
+  return company ?? null;
+}
+
 export async function updateCompanyProfile(companyId, profile) {
   const id = toObjectId(companyId, 'companyId');
-  const current = await companies().findOne({ _id: id }, { projection: { qualifications: 1, contact: 1 } });
+  const current = await companies().findOne({ _id: id }, { projection: { qualifications: 1, contact: 1, tags: 1 } });
   if (!current) return null;
+
+  let linkedTags;
+  if (Object.hasOwn(profile, 'tags')) {
+    const currentIds = new Set((current.tags || []).map((link) => String(link.tagId)));
+    const addedIds = profile.tags.map((link) => link.tagId).filter((tagId) => !currentIds.has(tagId));
+    // Existing inactive/missing links can survive unrelated profile edits, but
+    // newly selected links must point to active catalog records.
+    if (addedIds.length) await assertActiveTagIds(addedIds);
+    linkedTags = profile.tags.map(({ tagId }) => ({ tagId: toObjectId(tagId, 'tagId') }));
+  }
 
   const now = new Date();
   const updated = await companies().findOneAndUpdate(
@@ -65,6 +94,7 @@ export async function updateCompanyProfile(companyId, profile) {
         technologies: profile.technologies,
         qualifications: mergeQualifications(current.qualifications, profile.qualifications),
         contact: { ...(current.contact && typeof current.contact === 'object' ? current.contact : {}), email: profile.contactEmail },
+        ...(linkedTags ? { tags: linkedTags } : {}),
         updatedAt: now
       }
     },

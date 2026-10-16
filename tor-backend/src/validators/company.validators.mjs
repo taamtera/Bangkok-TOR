@@ -33,12 +33,29 @@ function textList(value, label, maxItems, maxLength) {
   });
 }
 
+function tagLinks(value) {
+  if (!Array.isArray(value) || value.length > 50) invalid('tags must be a list with no more than 50 catalog links.');
+  const seen = new Set();
+  return value.map((link) => {
+    if (!link || typeof link !== 'object' || Array.isArray(link)
+      || Object.keys(link).some((key) => key !== 'tagId')
+      || typeof link.tagId !== 'string' || !/^[a-f\d]{24}$/i.test(link.tagId)) {
+      invalid('Each profile tag must contain only a valid catalog tagId.');
+    }
+    return { tagId: link.tagId.toLowerCase() };
+  }).filter(({ tagId }) => {
+    if (seen.has(tagId)) return false;
+    seen.add(tagId);
+    return true;
+  });
+}
+
 export function validateCompanyProfile(body = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     invalid('A company profile object is required.');
   }
 
-  const allowed = new Set(['displayName', 'companySize', 'district', 'contactEmail', 'technologies', 'qualifications']);
+  const allowed = new Set(['displayName', 'companySize', 'district', 'contactEmail', 'technologies', 'qualifications', 'tags']);
   const unsupported = Object.keys(body).find((field) => !allowed.has(field));
   if (unsupported) invalid(`Unsupported company profile field: ${unsupported}.`);
 
@@ -54,6 +71,7 @@ export function validateCompanyProfile(body = {}) {
     district: district || null,
     contactEmail: contactEmail || null,
     technologies: textList(body.technologies, 'Technologies', 50, 100),
-    qualifications: textList(body.qualifications, 'Qualifications', 100, 200)
+    qualifications: textList(body.qualifications, 'Qualifications', 100, 200),
+    ...(Object.hasOwn(body, 'tags') ? { tags: tagLinks(body.tags) } : {})
   };
 }

@@ -1,3 +1,4 @@
+import { torDocumentsSchema } from './tor-document-schema.mjs';
 // The crawler writes only these three collections. Application collections are separate.
 export const STAGE_STATUS = {
   P0: 'procurement_planned', '15': 'reference_price_published', B0: 'draft_tender_published',
@@ -25,6 +26,7 @@ export const ingestionDefinitions = {
       'lastSeenAt', 'status', 'statusPublishedAt', 'statusOrderAmbiguous', 'stageObservations', 'biddingOpenVerified'],
     properties: {
       projectId: { bsonType: 'string', minLength: 1 },
+      documents: torDocumentsSchema,
       // Explicitly reject the retired top-level identities while permitting raw itemParams.
       templateId: { not: {} }, projectKey: { not: {} }, announcementType: { not: {} },
       scope: { enum: ['department'] }, linkedProjectId: text,

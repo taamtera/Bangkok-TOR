@@ -5,6 +5,8 @@ import { useLanguage } from '@/lib/LanguageProvider';
 import React, { useEffect, useRef, useState } from 'react';
 import { SoftwareHouseProfile } from '@/types';
 import { BANGKOK_DISTRICTS } from '@/data/mockData';
+import { ContractorServices } from './ContractorServices';
+import { listTags, type ControlledTag } from '@/lib/tagApi';
 import { 
   X, 
   ShieldCheck, 
@@ -34,6 +36,9 @@ export const SoftwareHouseProfileModal: React.FC<ProfileModalProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<ControlledTag[]>([]);
+  const [catalogError, setCatalogError] = useState(false);
+  const [selectedService, setSelectedService] = useState('');
   const wasOpen = useRef(false);
   const lastCurrentUser = useRef(currentUser);
 
@@ -50,6 +55,17 @@ export const SoftwareHouseProfileModal: React.FC<ProfileModalProps> = ({
     lastCurrentUser.current = currentUser;
     wasOpen.current = isOpen;
   }, [currentUser, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setCatalogError(false);
+    setSelectedService('');
+    void listTags().then(tags => {
+      if (!cancelled) setCatalog(tags.filter(tag => tag.status !== 'inactive' && tag.contractorLabel));
+    }).catch(() => { if (!cancelled) setCatalogError(true); });
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -172,6 +188,22 @@ export const SoftwareHouseProfileModal: React.FC<ProfileModalProps> = ({
                 className="w-full px-4 py-2.5 theme-input rounded-xl text-sm"
               />
             </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+            <ContractorServices tags={profile.tags ?? []} onRemove={tagId => setProfile(previous => ({ ...previous, tags: (previous.tags ?? []).filter(tag => tag.tagId !== tagId) }))} />
+            <div className="flex gap-2">
+              <select aria-label={t('Select contractor service')} className="theme-input min-w-0 flex-1 rounded-lg px-3 py-2 text-sm" value={selectedService} onChange={event => setSelectedService(event.target.value)}>
+                <option value="">{t('Select contractor service')}</option>
+                {catalog.filter(tag => !profile.tags?.some(link => link.tagId === tag._id)).map(tag => <option key={tag._id} value={tag._id}>{tag.contractorLabel}</option>)}
+              </select>
+              <button type="button" disabled={!selectedService} className="rounded-lg bg-sky-600 px-3 py-2 text-sm text-white disabled:opacity-40" onClick={() => {
+                const tag = catalog.find(item => item._id === selectedService);
+                if (tag) setProfile(previous => ({ ...previous, tags: [...(previous.tags ?? []), { tagId: tag._id, contractorLabel: tag.contractorLabel, text: tag.text ?? tag.name, category: tag.category, type: tag.type, status: tag.status }] }));
+                setSelectedService('');
+              }}>{t('Add contractor service')}</button>
+            </div>
+            {catalogError && <p role="status" className="text-xs text-slate-500">{t('Could not load contractor services.')}</p>}
           </div>
 
           {/* Section: คุณสมบัติ & ศักยภาพบริษัท (property list input matching wireframe 'property') */}

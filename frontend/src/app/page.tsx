@@ -21,6 +21,7 @@ import { TORCard } from '@/components/TORCard';
 import { TORDetailModal } from '@/components/TORDetailModal';
 import { AuthModal } from '@/components/AuthModal';
 import { SoftwareHouseProfileModal } from '@/components/SoftwareHouseProfileModal';
+import { ContractorServices } from '@/components/ContractorServices';
 import { AIRecommendationView } from '@/components/AIRecommendationView';
 import { MatchingResultsView } from '@/components/MatchingResultsView';
 import { NotificationToast } from '@/components/NotificationToast';
@@ -428,7 +429,8 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
               </div>
 
               <div>
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">{t("Company qualifications")} </h3>
+                <ContractorServices tags={currentUser.tags ?? []} />
+                <h3 className="mt-6 text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">{t("Company qualifications")} </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {currentUser.properties.map((prop, idx) => (
                     <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-200 flex items-center gap-2">

@@ -7,6 +7,9 @@ export type CompanyEvidenceLevel = 'claimed' | 'experienced' | 'verified';
 export interface ControlledTag {
   _id: string;
   name: string;
+  text?: string;
+  contractorLabel?: string | null;
+  type?: string;
   category: string;
   aliases?: string[];
   description?: string | null;

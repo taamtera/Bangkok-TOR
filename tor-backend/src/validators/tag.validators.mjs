@@ -25,6 +25,12 @@ function optionalString(value, fieldName) {
   return value.trim();
 }
 
+function contractorLabel(value) {
+  const label = optionalString(value, 'contractorLabel');
+  if (label && label.length > 200) invalid('contractorLabel must be 200 characters or fewer.');
+  return label || null;
+}
+
 function validateAliases(value) {
   if (!Array.isArray(value) || value.length > 20 || value.some((alias) => typeof alias !== 'string')) {
     invalid('aliases must be an array containing no more than 20 text values.');
@@ -81,6 +87,7 @@ export function validateCreateTag(body) {
     name,
     type,
     category,
+    contractorLabel: contractorLabel(input.contractorLabel),
     aliases: validateAliases(input.aliases ?? []),
     description: optionalString(input.description, 'description')
   };
@@ -88,7 +95,7 @@ export function validateCreateTag(body) {
 
 export function validateUpdateTag(body) {
   const input = body ?? {};
-  const allowedFields = new Set(['name', 'category', 'aliases', 'description', 'status']);
+  const allowedFields = new Set(['name', 'text', 'category', 'type', 'contractorLabel', 'aliases', 'description', 'status']);
   const unknownFields = Object.keys(input).filter((field) => !allowedFields.has(field));
   if (unknownFields.length > 0) {
     invalid(`Unsupported tag field: ${unknownFields[0]}.`);
@@ -98,8 +105,17 @@ export function validateUpdateTag(body) {
   }
 
   const update = {};
-  if (Object.hasOwn(input, 'name')) {
-    update.name = requiredString(input.name, 'name', 2);
+  if (Object.hasOwn(input, 'text') || Object.hasOwn(input, 'name')) {
+    update.name = requiredString(input.text ?? input.name, 'text', 2);
+    if (Object.hasOwn(input, 'text') && Object.hasOwn(input, 'name') && input.name !== input.text) {
+      invalid('text and name must match when both are supplied.');
+    }
+  }
+  if (Object.hasOwn(input, 'type')) {
+    update.type = requiredString(input.type, 'type');
+  }
+  if (Object.hasOwn(input, 'contractorLabel')) {
+    update.contractorLabel = contractorLabel(input.contractorLabel);
   }
   if (Object.hasOwn(input, 'category')) {
     update.category = requiredString(input.category, 'category');

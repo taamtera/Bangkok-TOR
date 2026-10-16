@@ -116,7 +116,6 @@ export function planProjectMigration(announcements, thumbnails) {
     delete project.announcementType;
     delete project.externalId;
     delete project.dedupKey;
-    delete project.documents;
     delete project.organization;
     delete project.sourceUrl;
     projects.push(project);

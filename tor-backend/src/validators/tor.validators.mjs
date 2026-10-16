@@ -1,4 +1,5 @@
 import { httpError } from '../utils/http-error.mjs';
+import { normalizeTorDocuments } from '../models/tor-document.mjs';
 
 const TOR_STATUSES = ['procurement_planned', 'reference_price_published', 'draft_tender_published', 'invitation_published', 'award_published', 'invitation_cancelled', 'award_cancelled', 'invitation_amended', 'award_amended', 'multiple_announcements_same_day'];
 const UPDATE_FIELDS = [
@@ -16,7 +17,8 @@ const UPDATE_FIELDS = [
   'documentUrl',
   'thumbnail',
   'status',
-  'budget'
+  'budget',
+  'documents'
 ];
 
 function invalid(message) {
@@ -110,6 +112,21 @@ export function validateTorUpdate(body) {
   }
   if (body.budget !== undefined) {
     update.budget = validateBudget(body.budget);
+  }
+  if (body.documents !== undefined) {
+    if (!Array.isArray(body.documents)) invalid('documents must be an array.');
+    for (const document of body.documents) {
+      if (!document || typeof document !== 'object' || Array.isArray(document)) invalid('Each document must be an object.');
+      if (document.filename != null && typeof document.filename !== 'string') invalid('documents.filename must be text or null.');
+      for (const field of ['sourceFormat', 'extractionStatus', 'extractedText']) {
+        if (document[field] !== undefined && typeof document[field] !== 'string') invalid(`documents.${field} must be text.`);
+      }
+      if (document.pages != null && !Array.isArray(document.pages)
+        && !(Number.isSafeInteger(document.pages) && document.pages >= 0)) invalid('documents.pages must be a non-negative page count, an extractor page array, or null.');
+    }
+    // Preserve full text, whitespace, empty extraction results, and extra attachment metadata.
+    // The repository uses $set, replacing this project's entire grouped array.
+    update.documents = normalizeTorDocuments(body.documents);
   }
 
   return update;

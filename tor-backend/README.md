@@ -70,6 +70,18 @@ Successful detail and update responses use `{ "tor": {} }`. Invalid update field
 
 ## Tagging API
 
+Catalog tags support `contractorLabel`: `text` describes what the project needs,
+while `contractorLabel` names the kind of contractor providing it. For example,
+`{"text":"Internet Service","contractorLabel":"Internet Service Provider","category":"technology","type":"specification"}`.
+Supply this field in `POST /api/tags` or update it with
+`PATCH /api/tags/:tagId` using `{"contractorLabel":"Internet Service Provider"}`.
+It is optional, trimmed, and limited to 200 characters; null or blank clears it.
+GET list/detail responses include `contractorLabel: null` for older tags that do
+not have a value. Search also matches the contractor label. It is catalog display
+metadata, not proof of a company's capabilities or a TOR assignment's requirement
+level. Updating it preserves the tag ID and existing references. No MongoDB schema
+migration or bulk guessing of contractor labels is required.
+
 Project discovery accepts `search` (all whitespace-separated terms, literal case-insensitive substrings across project ID, title, description, department ID and name), `departmentId`, `procurementMethod`, `stage`, `stageScope=latest|retained`, `fromDate`, `toDate`, and `sort=latest|oldest|relevance`. Dates use inclusive `YYYY-MM-DD` bounds on `statusPublishedAt`. Latest-stage filtering includes each stage tied on the latest publication day. Retained-stage filtering considers the latest stored observation of each stage, not a complete announcement history. `__unknown__` selects missing departments or methods. Project and department IDs remain strings.
 
 `page` and `limit` select a result page. Responses also include `totalAllProjects` and global `facets.departments` (`value`, `name`, `count`) and `facets.methods` (`value`, `count`). Facet counts describe the whole collection, rather than the filtered page. Relevance prioritizes exact IDs, followed by title and department matches; it is not an AI compatibility score.
@@ -77,7 +89,7 @@ Project discovery accepts `search` (all whitespace-separated terms, literal case
 - `GET /api/tags`: list active tags; accepts `category` and `search` query parameters
 - `POST /api/tags`: create a controlled tag; system administrator only
 - `GET /api/tags/:tagId`: read a tag, including inactive tags; system administrator only
-- `PATCH /api/tags/:tagId`: update a tag's name, category, aliases, description, or active status; system administrator only. The tag slug remains stable.
+- `PATCH /api/tags/:tagId`: update a tag's text/name, category, type, contractor label, aliases, description, or active status; system administrator only. The tag slug remains stable.
 - `DELETE /api/tags/:tagId`: deactivate a tag; system administrator only. Tags are not physically deleted because companies and TORs may reference them.
 - `PUT /api/tags/companies/:companyId`: replace a company's approved tags; company member or system administrator
 - `PUT /api/tags/tors/:projectId`: replace a TOR's approved tags; project manager or system administrator
@@ -105,6 +117,14 @@ These routes require a scoped `AI_REQUIREMENTS_TOKEN` bearer key, not a human ad
 ### Company profile API
 
 - `GET /api/companies/me`: return the authenticated user's linked company profile.
+- Profile `tags` are simple catalog references stored in `companies.tags` as
+  `[{ tagId: ObjectId(...) }]`. Include `tags: [{ "tagId": "<catalog-id>" }]` in a
+  profile PUT to select contractor services, or `tags: []` to clear them. Omitting
+  the field preserves existing links. Newly selected IDs must exist and be active.
+  GET and PUT responses resolve `contractorLabel`, `text`, `category`, `type`, and
+  `status` from the linked catalog records; clients save only tag IDs, never
+  copies of those labels. Catalog label edits appear on the next profile read.
+  These display links do not create or replace evidence-bearing `tagAssignments`.
 - `PUT /api/companies/me`: update the linked company's display name, size, district, primary contact email, technologies, and qualification names. Qualification names are stored as objects in `companies.qualifications`; unchanged entries retain existing evidence metadata. Exact profile entries are linked as self-reported `claimed` capabilities and are never marked verified.
 - `POST /api/companies/me/matching-tags/sync`: link the current profile's exact technology and qualification entries to active tags as self-reported `claimed` capabilities. The operation is idempotent and does not create TOR requirements.
 

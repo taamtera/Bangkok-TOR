@@ -43,8 +43,24 @@ test('company serialization exposes profile values without leaking tag or owners
     tagAssignments: [{ tagId: 'internal' }], ownerUserId: 'internal'
   }), {
     displayName: 'Display Name', companySize: '', district: '', contactEmail: 'contact@example.com',
-    technologies: ['Docker'], qualifications: ['ISO']
+    technologies: ['Docker'], qualifications: ['ISO'], tags: []
   });
+});
+
+test('company profile accepts only catalog tag references, deduplicates IDs, and preserves omitted links', () => {
+  const base = { displayName: 'Example Internet Company', technologies: [], qualifications: [] };
+  const tagId = '6ad1754a40f2d3dadd04ffda';
+  assert.deepEqual(validateCompanyProfile({ ...base, tags: [{ tagId }, { tagId: tagId.toUpperCase() }] }).tags, [{ tagId }]);
+  assert.deepEqual(validateCompanyProfile({ ...base, tags: [] }).tags, []);
+  assert.equal(Object.hasOwn(validateCompanyProfile(base), 'tags'), false);
+  for (const tags of [[{ tagId: 'invalid' }], [{ tagId, contractorLabel: 'Forged provider' }], [null], null, Array.from({ length: 51 }, () => ({ tagId }))]) {
+    assert.throws(() => validateCompanyProfile({ ...base, tags }), { code: 'INVALID_COMPANY_PROFILE' });
+  }
+});
+
+test('company profile serialization includes resolved catalog labels without matching provenance', () => {
+  const profile = toCompanyProfile({ tags: [{ tagId: '6ad1754a40f2d3dadd04ffda', text: 'Internet Service', contractorLabel: 'Internet Service Provider', category: 'technology', type: 'specification', status: 'active', internalNotes: 'private' }] });
+  assert.deepEqual(profile.tags, [{ tagId: '6ad1754a40f2d3dadd04ffda', text: 'Internet Service', contractorLabel: 'Internet Service Provider', category: 'technology', type: 'specification', status: 'active' }]);
 });
 
 test('qualification updates retain existing evidence and do not mark new text as verified', () => {

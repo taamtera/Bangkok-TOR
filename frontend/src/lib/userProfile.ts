@@ -44,7 +44,8 @@ export function companyDataToProfile(
     district: company.district || '',
     email: company.contactEmail || profile.email,
     properties: company.qualifications || [],
-    technologies: company.technologies || []
+    technologies: company.technologies || [],
+    tags: company.tags ?? profile.tags
   };
 }
 
@@ -55,6 +56,7 @@ export function profileToCompanyData(profile: SoftwareHouseProfile): CompanyProf
     district: profile.district,
     contactEmail: profile.email,
     technologies: profile.technologies,
-    qualifications: profile.properties
+    qualifications: profile.properties,
+    ...(profile.tags ? { tags: profile.tags.map(({ tagId }) => ({ tagId })) } : {})
   };
 }

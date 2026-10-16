@@ -17,6 +17,15 @@ const input = () => ({ sourceId: String(source._id), torVersion: 1, model: { pro
 test('source quotations and explicit clauses validate without human approval', () => {
   assert.equal(validateAiRequirements(input(), source).requirements[0].importance, 'required');
 });
+
+test('new AI catalog tags may include a contractor-facing label separate from source evidence', () => {
+  const body = input();
+  body.requirements[0].clauses[0].anyOf[0].contractorLabel = ' Containerization Service Provider ';
+  const parsed = validateAiRequirements(body, source);
+  assert.equal(parsed.requirements[0].clauses[0].anyOf[0].contractorLabel, 'Containerization Service Provider');
+  body.requirements[0].clauses[0].anyOf[0].contractorLabel = 'x'.repeat(201);
+  assert.throws(() => validateAiRequirements(body, source), /contractorLabel/);
+});
 test('fabricated quotes, wrong pages, low confidence and stale versions are rejected', () => {
   for (const mutate of [
     (body) => { body.requirements[0].evidence.quote = 'The company must possess an ISO 27001 certificate.'; },

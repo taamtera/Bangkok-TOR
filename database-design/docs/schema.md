@@ -264,6 +264,12 @@ Important fields:
 - `profileCompleteness`: profile completion percentage, separate from requirement coverage
 - `verificationStatus`: `unverified`, `pending`, `verified`, or `rejected`
 - `tagAssignments`: controlled capability tags with provenance, confidence, verification level, review status, and evidence. Profile entries are linked as self-reported `claimed` capabilities and are not independently verified.
+- `tags`: optional contractor-profile display links, each `{ tagId: ObjectId }`
+  referencing `tags._id`. The profile resolves `contractorLabel` through a lookup;
+  it does not store copies of provider labels. For example, an Internet Service
+  tag displays Internet Service Provider. These simple links do not replace
+  matching/verification metadata in `tagAssignments`. Older profiles may omit
+  the field; an empty array explicitly represents no selected services.
 
 ## 14. `tags`
 
@@ -284,6 +290,12 @@ classifies contractor eligibility/capability concepts; the second classifies
 products, technical features, architecture, or deliverables. More types can be
 introduced later. These are application/documentation rules; no new MongoDB
 validator is installed. Optional metadata may remain absent.
+
+`contractorLabel` is optional contractor-facing display text, for example
+`text: "Internet Service"` with `contractorLabel: "Internet Service Provider"`.
+It describes the kind of provider, not whether a company meets a requirement.
+The backend accepts it on create/update and returns null when an older catalog
+entry has no label. It does not change tag identity or TOR/company references.
 
 The unique `uq_tags_category_text` index on `{ category: 1, text: 1 }` supports
 workflows using `$merge.on: ["category", "text"]`. Legacy uniqueness constraints

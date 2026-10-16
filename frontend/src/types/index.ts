@@ -32,7 +32,18 @@ export interface StageObservation {
   [key: string]: unknown;
 }
 
+export interface TorDocument {
+  filename: string | null;
+  sourceFormat: string;
+  extractionStatus: string;
+  // Numeric counts and original extractor page arrays are distinct representations.
+  pages: number | unknown[] | null;
+  extractedText: string;
+  [key: string]: unknown;
+}
+
 export interface ProjectFields {
+  documents?: TorDocument[];
   scope: string;
   linkedProjectId: string | null;
   identityScope: 'project' | 'plan';
@@ -77,6 +88,15 @@ export interface TORContract extends Partial<ProjectFields> {
   thumbnail?: string;
 }
 
+export interface CompanyCatalogTag {
+  tagId: string;
+  contractorLabel?: string | null;
+  text?: string | null;
+  category?: string | null;
+  type?: string | null;
+  status?: string | null;
+}
+
 export interface SoftwareHouseProfile {
   id: string;
   companyId?: string | null;
@@ -89,6 +109,7 @@ export interface SoftwareHouseProfile {
   companySize: string;
   district: string;
   properties: string[]; // List of company qualifications / capabilities
+  tags?: CompanyCatalogTag[];
   technologies: string[];
   certifications: string[];
   minPreferredBudget: number;

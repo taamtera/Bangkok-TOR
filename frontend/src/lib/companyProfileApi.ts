@@ -1,5 +1,6 @@
 import { resolveApiUrl } from './api';
 import { fetchWithSessionRefresh } from './authApi';
+import type { CompanyCatalogTag } from '@/types';
 
 export interface CompanyProfileData {
   displayName: string;
@@ -8,6 +9,7 @@ export interface CompanyProfileData {
   contactEmail: string;
   technologies: string[];
   qualifications: string[];
+  tags?: CompanyCatalogTag[];
 }
 
 async function request(path: string, method: 'GET' | 'PUT', profile?: CompanyProfileData) {

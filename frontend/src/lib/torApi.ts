@@ -72,6 +72,7 @@ export function toTorContract(tor: BackendTor): TORContract {
   return {
     id: tor.projectId,
     projectId: tor.projectId,
+    documents: tor.documents ?? [],
     scope: tor.scope ?? 'department',
     identityScope: tor.identityScope ?? (tor.projectId.startsWith('P') ? 'plan' : 'project'),
     linkedProjectId: tor.linkedProjectId ?? null,

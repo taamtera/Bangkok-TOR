@@ -5,7 +5,8 @@ function qualificationName(qualification) {
 }
 
 // Keep the company-profile response intentionally limited to editable profile
-// fields. Tag assignments and internal ownership data use their own APIs.
+// fields and resolved public catalog labels. Matching assignments and internal
+// ownership data use their own APIs.
 export function toCompanyProfile(company) {
   if (!company) return null;
   return {
@@ -16,6 +17,14 @@ export function toCompanyProfile(company) {
     technologies: Array.isArray(company.technologies) ? company.technologies : [],
     qualifications: Array.isArray(company.qualifications)
       ? company.qualifications.map(qualificationName).filter(Boolean)
-      : []
+      : [],
+    tags: Array.isArray(company.tags) ? company.tags.filter((link) => link?.tagId).map((link) => ({
+      tagId: link.tagId.toString(),
+      contractorLabel: link.contractorLabel ?? null,
+      text: link.text ?? null,
+      category: link.category ?? null,
+      type: link.type ?? null,
+      status: link.status ?? null
+    })) : []
   };
 }

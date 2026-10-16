@@ -48,12 +48,35 @@ const { Header } = load('components/Header.tsx');
 const { AuthModal } = load('components/AuthModal.tsx');
 const { DocumentPreview } = load('components/PDFReader.tsx');
 const { ProjectObservations } = load('components/ProjectObservations.tsx');
+const { ContractorServices } = load('components/ContractorServices.tsx');
+const { companyDataToProfile, profileToCompanyData } = load('lib/userProfile.ts');
 const { TORCard } = load('components/TORCard.tsx');
 const { DEFAULT_FILTERS } = load('lib/discovery.ts');
 const { toTorContract } = load('lib/torApi.ts');
 const { procurementMethodLabel } = load('lib/translate.ts');
 const render = (language, component, props) => renderToStaticMarkup(React.createElement(LanguageProvider,
   { initialLanguage: language }, React.createElement(component, props)));
+
+test('contractor profile displays live contractorLabel values instead of project tag text', () => {
+  const tags = [{ tagId: '6ad1754a40f2d3dadd04ffda', text: 'Internet Service', contractorLabel: 'Internet Service Provider' }];
+  for (const language of ['en', 'th']) {
+    const html = render(language, ContractorServices, { tags });
+    assert.match(html, /Internet Service Provider/);
+    assert.doesNotMatch(html, />Internet Service</);
+  }
+  assert.match(render('th', ContractorServices, { tags: [] }), /ยังไม่ได้เลือกบริการของผู้รับจ้าง/);
+  assert.doesNotMatch(render('en', ContractorServices, { tags: [{ ...tags[0], contractorLabel: null }] }), /Internet Service Provider|>Internet Service</);
+});
+
+test('profile hydration keeps resolved labels but sends only tagId links when saving', () => {
+  const base = { companyName: 'Example', properties: [], technologies: [] };
+  const tags = [{ tagId: '6ad1754a40f2d3dadd04ffda', text: 'Internet Service', contractorLabel: 'Internet Service Provider' }];
+  const profile = companyDataToProfile(base, { displayName: 'Example', companySize: '', district: '', qualifications: [], technologies: [], tags });
+  assert.deepEqual(profile.tags, tags);
+  assert.deepEqual(profileToCompanyData(profile).tags, [{ tagId: tags[0].tagId }]);
+  assert.equal(Object.hasOwn(profileToCompanyData(base), 'tags'), false);
+  assert.deepEqual(profileToCompanyData({ ...profile, tags: [] }).tags, []);
+});
 
 test('filters render one language while preserving original IDs and method values', () => {
   const props = { filters: { ...DEFAULT_FILTERS, datePreset: '7', status: 'D0', department: '0001' }, setFilters() {}, onResetFilters() {},

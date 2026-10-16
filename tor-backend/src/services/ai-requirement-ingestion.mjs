@@ -18,7 +18,7 @@ async function resolveTag(db, requested, quote, session) {
     if (!tag) {
       const now = new Date();
       tag = await db.collection('tags').findOneAndUpdate({ category, normalizedName }, {
-        $setOnInsert: { name, category, normalizedName, aliases: core?.aliases || [name],
+        $setOnInsert: { name, text: name, category, normalizedName, contractorLabel: requested.contractorLabel ?? null, aliases: core?.aliases || [name],
           ...(core ? { conceptKey: core.conceptKey } : {}),
           slug: `auto-${createHash('sha256').update(`${category}:${normalizedName}`).digest('hex').slice(0, 20)}`,
           status: 'active', createdAt: now, updatedAt: now, createdByUserId: null,
