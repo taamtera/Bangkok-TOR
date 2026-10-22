@@ -5,6 +5,7 @@ import { httpError } from '../utils/http-error.mjs';
 import { toObjectId } from '../utils/object-id.mjs';
 import { prepareMatchingTors } from './requirement-input.mjs';
 import { runPythonMatching } from './python-matching.mjs';
+import { publishMatchNotifications } from '../repositories/notification.repository.mjs';
 
 async function context(tors = null) {
   const projects = tors || await listTorsForMatching();
@@ -36,6 +37,12 @@ async function calculate(companies, source) {
   // Save zero and unavailable results as well: profile edits must overwrite a
   // previous positive match instead of leaving stale recommendations in storage.
   await saveCompanyMatches(records);
+  try {
+    await publishMatchNotifications(records, source.tors);
+  } catch {
+    // A notification outage must not discard successfully calculated matches.
+    console.error('Could not publish new-match notifications; a later matching refresh will retry.');
+  }
   return records;
 }
 

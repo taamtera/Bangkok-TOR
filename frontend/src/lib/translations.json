@@ -328,5 +328,16 @@
   "Not suitable": "ไม่เหมาะสม",
   "Points to consider": "ประเด็นที่ควรพิจารณา",
   "Company qualifications": "คุณสมบัติของบริษัท",
-  "Log in to see AI project recommendations for your company.": "เข้าสู่ระบบเพื่อดูคำแนะนำโครงการจาก AI สำหรับบริษัทของคุณ"
+  "Log in to see AI project recommendations for your company.": "เข้าสู่ระบบเพื่อดูคำแนะนำโครงการจาก AI สำหรับบริษัทของคุณ",
+  "Close notifications": "ปิดการแจ้งเตือน",
+  "unread": "ยังไม่ได้อ่าน",
+  "Unread": "ยังไม่ได้อ่าน",
+  "Refresh notifications": "รีเฟรชการแจ้งเตือน",
+  "Mark all as read": "ทำเครื่องหมายว่าอ่านทั้งหมดแล้ว",
+  "Mark as read": "ทำเครื่องหมายว่าอ่านแล้ว",
+  "Loading notifications...": "กำลังโหลดการแจ้งเตือน...",
+  "No notifications yet. New requirement matches will appear here.": "ยังไม่มีการแจ้งเตือน ผลการจับคู่ข้อกำหนดใหม่จะแสดงที่นี่",
+  "View TOR": "ดู TOR",
+  "This TOR is no longer available.": "ไม่พบ TOR นี้แล้ว",
+  "New TOR requirement match": "พบ TOR ที่ตรงกับข้อกำหนดใหม่"
 }

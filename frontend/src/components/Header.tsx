@@ -22,6 +22,7 @@ interface HeaderProps {
   onLogout: () => void;
   onOpenProfile: () => void;
   notificationCount: number;
+  onOpenNotifications: () => void;
   themeMode: 'light' | 'dark';
   onToggleTheme: () => void;
 }
@@ -34,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onOpenProfile,
   notificationCount,
+  onOpenNotifications,
   themeMode,
   onToggleTheme
 }) => {
@@ -133,11 +135,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Layers className="w-4 h-4" />
             <span>{t("AI recommendations")}</span>
-            {notificationCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 text-[10px] font-bold bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-800 rounded-full">
-                {notificationCount}
-              </span>
-            )}
           </button>
 
           <button
@@ -188,13 +185,14 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-3">
               {/* Notifications */}
               <button 
-                onClick={() => setActiveTab('recommendations')}
+                onClick={onOpenNotifications}
+                aria-label={`${t('Notifications')}: ${notificationCount} ${t('unread')}`}
                 className="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors"
                 title={t("Notifications")}
               >
                 <Bell className="w-4 h-4" />
                 {notificationCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-slate-600 dark:bg-slate-300 rounded-full ring-2 ring-white dark:ring-slate-900" />
+                  <span aria-hidden="true" className="absolute -top-2 -right-2 rounded-full bg-sky-600 px-1 text-[10px] font-bold text-white">{notificationCount > 99 ? '99+' : notificationCount}</span>
                 )}
               </button>
 

@@ -2,7 +2,7 @@
 import { useLanguage } from '@/lib/LanguageProvider';
 
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   SoftwareHouseProfile, 
   TORContract, 
@@ -24,7 +24,8 @@ import { SoftwareHouseProfileModal } from '@/components/SoftwareHouseProfileModa
 import { ContractorServices } from '@/components/ContractorServices';
 import { AIRecommendationView } from '@/components/AIRecommendationView';
 import { MatchingResultsView } from '@/components/MatchingResultsView';
-import { NotificationToast } from '@/components/NotificationToast';
+import { NotificationInbox } from '@/components/NotificationInbox';
+import * as notificationApi from '@/lib/notificationApi';
 import { DEFAULT_FILTERS, dateRange } from '@/lib/discovery';
 import { resolveApiUrl } from '@/lib/api';
 import { 
@@ -179,8 +180,27 @@ export default function Home() {
   // Profile Modal State
   const [profileModalOpen, setProfileModalOpen] = useState<boolean>(false);
 
-  const [activeNotification, setActiveNotification] = useState<TORContract | null>(null);
-  const [notificationCount] = useState<number>(0);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationSummary, setNotificationSummary] = useState({ userId: '', count: 0 });
+  const [notificationRefresh, setNotificationRefresh] = useState(0);
+  const notificationCount = notificationSummary.userId === currentUser?.id ? notificationSummary.count : 0;
+  const closeNotifications = useCallback(() => setNotificationsOpen(false), []);
+  const refreshNotifications = useCallback(() => setNotificationRefresh(value => value + 1), []);
+  useEffect(() => {
+    if (!currentUser?.id) { setNotificationsOpen(false); setNotificationSummary({ userId: '', count: 0 }); return; }
+    const userId = currentUser.id;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const result = await notificationApi.listNotifications(1, 1, controller.signal);
+        if (!controller.signal.aborted) setNotificationSummary({ userId, count: result.unreadCount });
+      } catch { /* The inbox exposes load failures; a background poll never interrupts discovery. */ }
+      finally { if (!controller.signal.aborted) timer = setTimeout(() => void poll(), 30000); }
+    }
+    void poll();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [currentUser?.id, notificationRefresh]);
   const filteredContracts = contracts;
 
   const saveCompanyProfile = async (updated: SoftwareHouseProfile) => {
@@ -276,6 +296,7 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
         onLogout={handleLogout}
         onOpenProfile={() => setProfileModalOpen(true)}
         notificationCount={notificationCount}
+        onOpenNotifications={() => setNotificationsOpen(true)}
         themeMode={themeMode}
         onToggleTheme={handleToggleTheme}
       />
@@ -492,12 +513,9 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
         />
       )}
 
-      {/* Notification Toast Alert */}
-      <NotificationToast
-        contract={activeNotification}
-        onClose={() => setActiveNotification(null)}
-        onViewContract={(c) => setSelectedContract(c)}
-      />
+      {currentUser && notificationsOpen && <NotificationInbox key={currentUser.id}
+        onClose={closeNotifications} onChanged={refreshNotifications}
+        onViewProject={project => { setSelectedContract(project); setNotificationsOpen(false); }} />}
 
     </div>
   );
