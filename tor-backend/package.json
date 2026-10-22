@@ -19,6 +19,7 @@
     "express": "^5.2.1",
     "helmet": "^8.3.0",
     "mongodb": "^7.6.0",
+    "nodemailer": "^10.2.0",
     "pdfjs-dist": "6.4.299"
   }
 }

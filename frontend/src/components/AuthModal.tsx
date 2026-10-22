@@ -24,6 +24,7 @@ function splitName(fullName: string): { firstName: string; lastName: string } {
 // Turns a backend error into a clear, bilingual message. Keyed by the API error
 // code so the wording stays consistent even if the backend text changes.
 const ERROR_MESSAGES: Record<string, string> = {
+  EMAIL_NOT_CONFIGURED: 'Password reset is temporarily unavailable. Please contact support.',
   INVALID_CREDENTIALS: 'Incorrect email or password. Please try again.',
   EMAIL_ALREADY_REGISTERED: 'This email is already registered. Try logging in instead.',
   ACCOUNT_LOCKED: 'Account temporarily locked after too many attempts. Try again later.',
@@ -138,9 +139,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       await authApi.forgotPassword(email);
       setInfoMsg('If an account exists for this email, a password reset link will be sent.');
-    } catch {
-      // Forgot-password is intentionally non-revealing; show the same message on error.
-      setInfoMsg('If an account exists for this email, a password reset link will be sent.');
+    } catch (error) {
+      setErrorMsg(friendlyAuthError(error));
     } finally {
       setLoading(false);
     }

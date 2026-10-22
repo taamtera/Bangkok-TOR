@@ -23,7 +23,7 @@ import { toSafeUser } from '../serializers/user.serializer.mjs';
 import { httpError } from '../utils/http-error.mjs';
 import { hashPassword, verifyPassword } from '../utils/password.mjs';
 import { generateRawToken, sha256, signAccessToken } from '../utils/tokens.mjs';
-import { sendPasswordResetEmail } from './email.service.mjs';
+import { ensureEmailDeliveryConfigured, sendPasswordResetEmail } from './email.service.mjs';
 
 const PASSWORD_RESET = 'password_reset';
 
@@ -272,6 +272,7 @@ export async function logoutAll({ userId }, context) {
 }
 
 export async function forgotPassword({ email }, context) {
+  ensureEmailDeliveryConfigured();
   const user = await findUserByEmail(email);
 
   if (user) {
@@ -285,7 +286,15 @@ export async function forgotPassword({ email }, context) {
       expiresAt: new Date(Date.now() + authConfig.passwordResetTtlMinutes * 60 * 1000)
     });
 
-    await sendPasswordResetEmail({ email: user.email, token: rawToken });
+    try {
+      await sendPasswordResetEmail({ email: user.email, token: rawToken });
+    } catch {
+      // Keep the public response identical for registered and unknown addresses,
+      // including when the mail provider is unavailable. Never log the raw token.
+      console.error('Password reset email delivery failed. Check SMTP configuration and provider availability.');
+      await audit(context, { event: 'auth.forgot_password', outcome: 'failure', targetType: 'user', targetId: user._id });
+      return GENERIC_EMAIL_RESULT;
+    }
     await audit(context, { event: 'auth.forgot_password', outcome: 'success', targetType: 'user', targetId: user._id });
   }
 

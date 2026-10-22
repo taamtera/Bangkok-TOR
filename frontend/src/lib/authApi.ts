@@ -107,6 +107,10 @@ export function forgotPassword(email: string): Promise<{ message: string }> {
   return request('/forgot-password', { body: JSON.stringify({ email }) });
 }
 
+export function resetPassword(token: string, password: string): Promise<{ message: string }> {
+  return request('/reset-password', { body: JSON.stringify({ token, password }) });
+}
+
 export function me(): Promise<{ user: SafeUser }> {
   return request('/me', { method: 'GET' });
 }

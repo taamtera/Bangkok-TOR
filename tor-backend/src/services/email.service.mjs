@@ -1,16 +1,27 @@
-import { authConfig } from '../config/env.mjs';
+import { authConfig, env } from '../config/env.mjs';
+import { createPasswordResetSender, validateEmailConfiguration } from './password-reset-email.mjs';
+import { httpError } from '../utils/http-error.mjs';
 
-// Email delivery stub. Until a real provider is wired in, delivery is logged so
-// verification / reset links are usable in development. The raw token appears ONLY
-// here and in the emailed link — never in the database or an API response.
-//
-// To make this real, replace `deliver` with an SMTP / transactional-email call.
-// Keep the function signatures so callers do not change.
+const emailConfig = {
+  mode: process.env.EMAIL_DELIVERY || 'smtp',
+  production: env.nodeEnv === 'production',
+  appBaseUrl: authConfig.appBaseUrl,
+  ttlMinutes: authConfig.passwordResetTtlMinutes,
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT || 465),
+  secure: process.env.SMTP_SECURE !== 'false',
+  user: process.env.SMTP_USER,
+  pass: process.env.SMTP_PASSWORD,
+  from: process.env.EMAIL_FROM
+};
 
-function deliver(kind, email, link) {
-  console.info(`[email:${kind}] to=${email} link=${link}`);
-}
+export const sendPasswordResetEmail = createPasswordResetSender(emailConfig);
 
-export async function sendPasswordResetEmail({ email, token }) {
-  deliver('reset-password', email, `${authConfig.appBaseUrl}/reset-password?token=${token}`);
+export function ensureEmailDeliveryConfigured() {
+  try {
+    validateEmailConfiguration(emailConfig);
+  } catch {
+    // Check before any user lookup so this response cannot reveal membership.
+    throw httpError(503, 'EMAIL_NOT_CONFIGURED', 'Password reset is temporarily unavailable.');
+  }
 }
