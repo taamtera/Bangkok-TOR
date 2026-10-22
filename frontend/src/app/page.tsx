@@ -105,6 +105,12 @@ export default function Home() {
   const [pageQueryKey, setPageQueryKey] = useState(queryKey);
   const effectivePage = pageQueryKey === queryKey ? page : 1;
   useEffect(() => {
+    if (pageQueryKey !== queryKey) {
+      setPage(1);
+      setPageQueryKey(queryKey);
+    }
+  }, [queryKey, pageQueryKey]);
+  useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     const refresh = async (initial = false) => {

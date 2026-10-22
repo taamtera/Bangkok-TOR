@@ -27,7 +27,16 @@ export const TORCard: React.FC<TORCardProps> = ({ contract, onSelect }) => {
   const { t, language } = useLanguage();
   return (
     <div 
+      role="button"
+      tabIndex={0}
+      aria-label={`${t('View project and document')}: ${contract.title}`}
       onClick={() => onSelect(contract)}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onSelect(contract);
+        }
+      }}
       className="theme-card rounded-lg p-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 cursor-pointer transition-all duration-200 group flex flex-col lg:flex-row gap-4 items-stretch shadow-sm"
     >
       {/* PDF Document Preview / Thumbnail Section */}

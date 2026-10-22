@@ -3,7 +3,7 @@ import { procurementMethodLabel } from '@/lib/translate';
 import { useLanguage } from '@/lib/LanguageProvider';
 
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { TORContract } from '@/types';
 import { DocumentPreview } from './PDFReader';
 import { ProjectObservations } from './ProjectObservations';
@@ -36,6 +36,24 @@ export const TORDetailModal: React.FC<TORDetailModalProps> = ({
 }) => {
   const { t, language } = useLanguage();
   const [activeTab, setActiveTab] = useState<'pdf' | 'ai-eval'>('pdf');
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const projectId = contract?.projectId;
+
+  useEffect(() => {
+    if (!projectId) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButton.current?.focus();
+    return () => previousFocus?.focus();
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [projectId, onClose]);
 
   if (!contract) return null;
 
@@ -45,6 +63,8 @@ export const TORDetailModal: React.FC<TORDetailModalProps> = ({
         
         {/* Modal Close Button */}
         <button
+          ref={closeButton}
+          aria-label={t('Close TOR details')}
           onClick={onClose}
           className="absolute top-4 right-4 z-20 p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors"
         >

@@ -135,8 +135,13 @@ export async function listBackendTors(options: Record<string, string | number> =
   Object.entries(options).forEach(([key, value]) => { if (value !== '') params.set(key, String(value)); });
   const endpoint = resolveApiUrl(`/api/tors?${params}`)!;
   const response = await fetch(endpoint, { credentials: 'include', cache: 'no-store', signal });
-  if (!response.ok) throw new Error(`The TOR backend returned HTTP ${response.status}.`);
-  const body = await response.json() as BackendTorListResponse & { facets?: DiscoveryFacets; totalAllProjects?: number };
+  const body = await response.json().catch(() => null) as (BackendTorListResponse & {
+    facets?: DiscoveryFacets;
+    totalAllProjects?: number;
+    error?: { message?: string };
+  }) | null;
+  if (!response.ok) throw new Error(body?.error?.message || `The TOR backend returned HTTP ${response.status}.`);
+  if (!body) throw new Error('The TOR backend returned an unreadable response. Please try again.');
   const validItems = (body.items || []).filter(tor => typeof tor.projectId === 'string' && tor.projectId.trim().length > 0);
   return { items: validItems, pagination: body.pagination, totalAllProjects: body.totalAllProjects ?? body.pagination.total,
     facets: body.facets ?? { departments: [], methods: [] } };
