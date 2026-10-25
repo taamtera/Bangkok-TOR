@@ -10,6 +10,7 @@ import {
 } from '@/types';
 import * as authApi from '@/lib/authApi';
 import * as companyProfileApi from '@/lib/companyProfileApi';
+import { saveCompanyAssignments } from '@/lib/tagApi';
 import * as torApi from '@/lib/torApi';
 import * as recommendationApi from '@/lib/aiRecommendationApi';
 import { companyDataToProfile, profileToCompanyData, safeUserToProfile } from '@/lib/userProfile';
@@ -205,6 +206,21 @@ export default function Home() {
 
   const saveCompanyProfile = async (updated: SoftwareHouseProfile) => {
     const company = await companyProfileApi.updateMyCompanyProfile(profileToCompanyData(updated));
+    // Capabilities for matching come ONLY from catalog tags. This endpoint rejects
+    // any tag that is not an active catalog tag, so the frontend can never create
+    // tags — the backend keeps its own tag-creation ability untouched.
+    if (updated.companyId) {
+      const assignments = (updated.tags ?? []).map((tag) => ({
+        tagId: tag.tagId,
+        verificationLevel: 'claimed' as const,
+        evidence: 'Selected from company profile.'
+      }));
+      try {
+        await saveCompanyAssignments(updated.companyId, assignments);
+      } catch {
+        // Profile fields saved; matching links can be retried from the profile.
+      }
+    }
     setCurrentUser((user) => user?.id === updated.id ? companyDataToProfile(updated, company) : user);
   };
 

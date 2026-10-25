@@ -43,8 +43,10 @@ export function companyDataToProfile(
     companySize: company.companySize === 'Not specified' ? '' : company.companySize,
     district: company.district || '',
     email: company.contactEmail || profile.email,
-    properties: company.qualifications || [],
-    technologies: company.technologies || [],
+    // Capabilities are catalog tags only. Display them by their contractor label
+    // (falling back to the catalog text when a tag has no label).
+    properties: (company.tags ?? []).map((tag) => tag.contractorLabel || tag.text || '').filter(Boolean),
+    technologies: [],
     tags: company.tags ?? profile.tags
   };
 }
@@ -55,8 +57,9 @@ export function profileToCompanyData(profile: SoftwareHouseProfile): CompanyProf
     companySize: profile.companySize,
     district: profile.district,
     contactEmail: profile.email,
-    technologies: profile.technologies,
-    qualifications: profile.properties,
-    ...(profile.tags ? { tags: profile.tags.map(({ tagId }) => ({ tagId })) } : {})
+    // Catalog tags are the only source of capabilities; no free-text is sent.
+    technologies: [],
+    qualifications: [],
+    tags: (profile.tags ?? []).map(({ tagId }) => ({ tagId }))
   };
 }

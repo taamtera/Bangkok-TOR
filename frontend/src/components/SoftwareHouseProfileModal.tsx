@@ -7,12 +7,10 @@ import { SoftwareHouseProfile } from '@/types';
 import { BANGKOK_DISTRICTS } from '@/data/mockData';
 import { ContractorServices } from './ContractorServices';
 import { listTags, type ControlledTag } from '@/lib/tagApi';
-import { 
-  X, 
-  ShieldCheck, 
-  Plus, 
-  Trash2, 
-  Save, 
+import {
+  X,
+  Plus,
+  Save,
   CheckCircle2
 } from 'lucide-react';
 
@@ -31,14 +29,12 @@ export const SoftwareHouseProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const { t } = useLanguage();
   const [profile, setProfile] = useState<SoftwareHouseProfile>({ ...currentUser });
-  const [newProperty, setNewProperty] = useState('');
-  const [newTech, setNewTech] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<ControlledTag[]>([]);
   const [catalogError, setCatalogError] = useState(false);
-  const [selectedService, setSelectedService] = useState('');
+  const [tagSearch, setTagSearch] = useState('');
   const wasOpen = useRef(false);
   const lastCurrentUser = useRef(currentUser);
 
@@ -60,7 +56,7 @@ export const SoftwareHouseProfileModal: React.FC<ProfileModalProps> = ({
     if (!isOpen) return;
     let cancelled = false;
     setCatalogError(false);
-    setSelectedService('');
+    setTagSearch('');
     void listTags().then(tags => {
       if (!cancelled) setCatalog(tags.filter(tag => tag.status !== 'inactive' && tag.contractorLabel));
     }).catch(() => { if (!cancelled) setCatalogError(true); });
@@ -69,31 +65,31 @@ export const SoftwareHouseProfileModal: React.FC<ProfileModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleAddProperty = () => {
-    if (newProperty.trim()) {
-      setProfile(prev => ({
-        ...prev,
-        properties: [...prev.properties, newProperty.trim()]
-      }));
-      setNewProperty('');
-    }
-  };
+  // Searchable catalog picker: capabilities can ONLY be chosen from the tag
+  // catalog (shown by contractor label), never typed in as free text.
+  const selectedTagIds = new Set((profile.tags ?? []).map((link) => link.tagId));
+  const query = tagSearch.trim().toLocaleLowerCase('en-US');
+  const tagMatches = query
+    ? catalog
+        .filter((tag) => !selectedTagIds.has(tag._id))
+        .filter((tag) => [tag.contractorLabel, tag.text, tag.name, ...(tag.aliases ?? [])]
+          .filter(Boolean).join(' ').toLocaleLowerCase('en-US').includes(query))
+        .slice(0, 25)
+    : [];
 
-  const handleRemoveProperty = (index: number) => {
-    setProfile(prev => ({
-      ...prev,
-      properties: prev.properties.filter((_, i) => i !== index)
+  const addTag = (tag: ControlledTag) => {
+    setProfile((previous) => ({
+      ...previous,
+      tags: [...(previous.tags ?? []), {
+        tagId: tag._id,
+        contractorLabel: tag.contractorLabel,
+        text: tag.text ?? tag.name,
+        category: tag.category,
+        type: tag.type,
+        status: tag.status
+      }]
     }));
-  };
-
-  const handleAddTech = () => {
-    if (newTech.trim()) {
-      setProfile(prev => ({
-        ...prev,
-        technologies: [...prev.technologies, newTech.trim()]
-      }));
-      setNewTech('');
-    }
+    setTagSearch('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -192,97 +188,35 @@ export const SoftwareHouseProfileModal: React.FC<ProfileModalProps> = ({
 
           <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-3">
             <ContractorServices tags={profile.tags ?? []} onRemove={tagId => setProfile(previous => ({ ...previous, tags: (previous.tags ?? []).filter(tag => tag.tagId !== tagId) }))} />
-            <div className="flex gap-2">
-              <select aria-label={t('Select contractor service')} className="theme-input min-w-0 flex-1 rounded-lg px-3 py-2 text-sm" value={selectedService} onChange={event => setSelectedService(event.target.value)}>
-                <option value="">{t('Select contractor service')}</option>
-                {catalog.filter(tag => !profile.tags?.some(link => link.tagId === tag._id)).map(tag => <option key={tag._id} value={tag._id}>{tag.contractorLabel}</option>)}
-              </select>
-              <button type="button" disabled={!selectedService} className="rounded-lg bg-sky-600 px-3 py-2 text-sm text-white disabled:opacity-40" onClick={() => {
-                const tag = catalog.find(item => item._id === selectedService);
-                if (tag) setProfile(previous => ({ ...previous, tags: [...(previous.tags ?? []), { tagId: tag._id, contractorLabel: tag.contractorLabel, text: tag.text ?? tag.name, category: tag.category, type: tag.type, status: tag.status }] }));
-                setSelectedService('');
-              }}>{t('Add contractor service')}</button>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={tagSearch}
+                onChange={event => setTagSearch(event.target.value)}
+                placeholder={t('Search contractor services…')}
+                aria-label={t('Search contractor services')}
+                className="w-full theme-input rounded-lg px-3 py-2 text-sm placeholder-slate-400"
+              />
+              {tagSearch.trim() && (
+                <ul className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800">
+                  {tagMatches.length ? tagMatches.map(tag => (
+                    <li key={tag._id}>
+                      <button
+                        type="button"
+                        onClick={() => addTag(tag)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                        <span>{tag.contractorLabel || tag.text}</span>
+                      </button>
+                    </li>
+                  )) : (
+                    <li className="px-3 py-2 text-xs text-slate-500">{t('No matching services.')}</li>
+                  )}
+                </ul>
+              )}
             </div>
             {catalogError && <p role="status" className="text-xs text-slate-500">{t('Could not load contractor services.')}</p>}
-          </div>
-
-          {/* Section: คุณสมบัติ & ศักยภาพบริษัท (property list input matching wireframe 'property') */}
-          <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4" />
-                <span>{t("property list")}</span>
-              </h3>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                {profile.properties.length}{t("Active Items")} </span>
-            </div>
-
-            {/* List of active properties */}
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {profile.properties.map((prop, idx) => (
-                <div 
-                  key={idx} 
-                  className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 shadow-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
-                    <span>{prop}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveProperty(idx)}
-                    className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Add new property line */}
-            <div className="flex items-center gap-2 pt-2">
-              <input
-                type="text"
-                value={newProperty}
-                onChange={(e) => setNewProperty(e.target.value)}
-                placeholder={t("Add a qualification, such as ISO 27001 or GIS experience")}
-                className="flex-1 px-4 py-2 theme-input rounded-xl text-xs placeholder-slate-400"
-              />
-              <button
-                type="button"
-                onClick={handleAddProperty}
-                className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-all shadow-sm shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>{t("Add property")}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Section: Technologies */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">{t("Technology expertise")} </label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {profile.technologies.map((tech, idx) => (
-                <span key={idx} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700">
-                  {tech}
-                </span>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={newTech}
-                onChange={(e) => setNewTech(e.target.value)}
-                placeholder={t("For example: Docker, PostgreSQL, Flutter...")}
-                className="flex-1 px-4 py-2 theme-input rounded-xl text-xs placeholder-slate-400"
-              />
-              <button
-                type="button"
-                onClick={handleAddTech}
-                className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition-all shrink-0 border border-slate-200 dark:border-slate-700"
-              >{t("+ Add technology")} </button>
-            </div>
           </div>
 
           {/* Alert Success */}
