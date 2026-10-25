@@ -229,7 +229,7 @@ export default function Home() {
     const knownBudgets = contracts.filter(project => project.price !== null);
     if (!knownBudgets.length) return t("Not available");
     const total = knownBudgets.reduce((acc, project) => acc + (project.price ?? 0), 0);
-    return `${(total / 1000000).toFixed(1)}M THB${knownBudgets.length < contracts.length ? ' (known budgets)' : ''}`;
+    return `${(total / 1000000).toFixed(1)}M THB`;
   }, [contracts]);
 
   // Handlers
@@ -331,7 +331,7 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
             />
 
             {/* Dashboard Stats */}
-            <DashboardStats />
+            <DashboardStats contracts={contracts} />
 
           </div>
         )}
