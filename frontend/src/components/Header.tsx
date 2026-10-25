@@ -42,10 +42,10 @@ export const Header: React.FC<HeaderProps> = ({
   const { t, language, setLanguage } = useLanguage();
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
-        
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap xl:flex-nowrap items-center justify-between gap-3">
+
         {/* Brand / Logo — keep blue on logo icon only */}
-        <div className="flex items-center gap-2 cursor-pointer " onClick={() => setActiveTab('dashboard')}>
+        <div className="shrink-0 flex items-center gap-2 cursor-pointer " onClick={() => setActiveTab('dashboard')}>
           <div className="w-9 h-9 rounded-lg bg-sky-600 text-white flex items-center justify-center shadow-sm">
             <svg 
               className="w-10 font-black tracking-tighter" 
@@ -86,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="order-3 w-full xl:order-none xl:w-auto flex overflow-x-auto items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-lg border border-slate-200 dark:border-slate-700 [&>button]:shrink-0 [&>button]:whitespace-nowrap">
+        <nav className="order-3 w-full xl:order-none xl:w-auto xl:min-w-0 flex overflow-x-auto items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-lg border border-slate-200 dark:border-slate-700 [&>button]:shrink-0 [&>button]:whitespace-nowrap">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
@@ -157,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
 
         {/* Right side controls */}
-        <div className="flex items-center gap-3">
+        <div className="shrink-0 flex items-center gap-3">
           <select
             aria-label={t('Language')}
             value={language}
