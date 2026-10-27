@@ -411,6 +411,7 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
 
       {/* MODAL 1: TOR Detail & PDF Reader (Desktop - 2) */}
       <TORDetailModal
+        currentUser={currentUser}
         contract={contracts.find(project => project.projectId === selectedContract?.projectId) ?? selectedContract}
         matchedTagIds={(currentUser?.tags ?? []).map(tag => tag.tagId)}
         onClose={() => setSelectedContract(null)}

@@ -328,6 +328,17 @@ const collectionDefinitions = {
       updatedAt: { bsonType: 'date' }
     }
   },
+  company_tor_evaluations: {
+    required: ['companyId', 'torId', 'projectId', 'inputHash', 'status', 'requestId', 'createdAt', 'updatedAt'],
+    properties: {
+      companyId: { bsonType: 'objectId' }, torId: { bsonType: 'objectId' }, projectId: { bsonType: 'string' },
+      inputHash: { bsonType: 'string', pattern: '^[a-f0-9]{64}$' }, requestId: { bsonType: 'string' },
+      status: { enum: ['processing', 'completed', 'failed'] },
+      evaluation: { bsonType: ['object', 'null'] }, error: { bsonType: ['object', 'null'] },
+      leaseExpiresAt: { bsonType: 'date' }, completedAt: { bsonType: 'date' },
+      createdAt: { bsonType: 'date' }, updatedAt: { bsonType: 'date' }
+    }
+  },
   saved_tors: {
     required: ['userId', 'torId', 'followUpStatus', 'createdAt', 'updatedAt'],
     properties: {
@@ -447,6 +458,9 @@ const indexes = {
     [{ companyId: 1, torId: 1, torVersion: 1 }, { unique: true, name: 'uq_matches_company_tor_version' }],
     [{ companyId: 1, score: -1, computedAt: -1 }, { name: 'ix_matches_company_score' }],
     [{ torId: 1, score: -1 }, { name: 'ix_matches_tor_score' }]
+  ],
+  company_tor_evaluations: [
+    [{ companyId: 1, projectId: 1, inputHash: 1 }, { unique: true, name: 'uq_company_tor_evaluation_input' }]
   ],
   saved_tors: [
     [{ userId: 1, torId: 1 }, { unique: true, name: 'uq_saved_user_tor' }],

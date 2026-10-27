@@ -1,0 +1,11 @@
+version: 1
+id: 90ec1be6-d235-493c-8fcf-f627650d63cc
+name: company-evaluation
+slug: company-evaluation
+protocol: http
+interceptRequests: true
+port: 4500
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

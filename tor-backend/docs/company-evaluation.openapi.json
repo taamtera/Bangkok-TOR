@@ -1,0 +1,263 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TOR Company Evaluation Webhook",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://n8n.taamtera.com"
+    }
+  ],
+  "paths": {
+    "/webhook/eval": {
+      "post": {
+        "operationId": "evaluateCompanyTor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "schemaVersion",
+                  "inputHash",
+                  "company",
+                  "tor"
+                ],
+                "properties": {
+                  "schemaVersion": {
+                    "type": "integer",
+                    "enum": [
+                      1
+                    ]
+                  },
+                  "inputHash": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "requestId": {
+                    "type": "string"
+                  },
+                  "company": {
+                    "type": "object",
+                    "required": [
+                      "companyId",
+                      "name"
+                    ],
+                    "properties": {
+                      "companyId": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "tor": {
+                    "type": "object",
+                    "required": [
+                      "projectId"
+                    ],
+                    "properties": {
+                      "projectId": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "limitations": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validated company-specific evaluation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "schemaVersion",
+                    "inputHash",
+                    "model",
+                    "evaluation"
+                  ],
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "integer",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    "inputHash": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "evaluation": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "summary",
+                        "priceScore",
+                        "priceAssessment",
+                        "qualificationMatchScore",
+                        "qualificationAnalysis",
+                        "riskLevel",
+                        "riskAnalysis",
+                        "keyRequirementsExtracted",
+                        "strengths",
+                        "gaps",
+                        "missingInformation"
+                      ],
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "priceScore": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "priceAssessment": {
+                          "type": "string"
+                        },
+                        "qualificationMatchScore": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "qualificationAnalysis": {
+                          "type": "string"
+                        },
+                        "riskLevel": {
+                          "type": "string",
+                          "enum": [
+                            "Low",
+                            "Medium",
+                            "High",
+                            "Unknown"
+                          ]
+                        },
+                        "riskAnalysis": {
+                          "type": "string"
+                        },
+                        "keyRequirementsExtracted": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "strengths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "gaps": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "missingInformation": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "schemaVersion": 1,
+                  "inputHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "model": "qwen3.5:9bu",
+                  "evaluation": {
+                    "summary": "The profile covers some requirements; evidence is self-reported.",
+                    "priceScore": null,
+                    "priceAssessment": "Insufficient cost evidence to assess budget feasibility.",
+                    "qualificationMatchScore": 70,
+                    "qualificationAnalysis": "Selected services overlap the provided TOR requirements.",
+                    "riskLevel": "Medium",
+                    "riskAnalysis": "Eligibility and certification evidence must be checked.",
+                    "keyRequirementsExtracted": [
+                      "Provide the requested service"
+                    ],
+                    "strengths": [
+                      "Relevant service selection"
+                    ],
+                    "gaps": [
+                      "No independently verified delivery evidence"
+                    ],
+                    "missingInformation": [
+                      "Supplier cost estimate"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Model failed or returned invalid JSON"
+          },
+          "422": {
+            "description": "Insufficient company information or no extracted document text; Ollama is not called.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "schemaVersion",
+                    "inputHash",
+                    "status",
+                    "missingInformation",
+                    "message"
+                  ],
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "integer",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    "inputHash": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "insufficient_data"
+                      ]
+                    },
+                    "missingInformation": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

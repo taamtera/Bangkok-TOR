@@ -16,6 +16,7 @@ test('current APIs work with canonical tags, live validators, sessions and polic
   process.env.MONGODB_DB_NAME = testName;
   process.env.NODE_ENV = 'test';
   process.env.AI_REQUIREMENTS_TOKEN = 'integration-test-worker-token-'.repeat(3);
+  if (process.env.TOR_EVALUATION_TEST_WEBHOOK_URL) process.env.TOR_EVALUATION_WEBHOOK_URL = process.env.TOR_EVALUATION_TEST_WEBHOOK_URL;
   const client = new MongoClient(process.env.MONGODB_URI);
   const { connectDatabase, closeDatabase } = await import('../src/config/database.mjs');
   let server;
@@ -85,6 +86,7 @@ test('current APIs work with canonical tags, live validators, sessions and polic
       firstSeenAt: '2026-10-27', lastSeenAt: '2026-10-27', status: 'invitation_published', statusPublishedAt: '2026-10-27',
       statusOrderAmbiguous: false, stageObservations: {}, biddingOpenVerified: false, budget: { maxAmount: 884000 },
       tagAssignments: [{ tagId: canonicalId, requirementLevel: 'required', evidence: quote, source: 'ai', reviewStatus: 'suggested' }],
+      documents: [{ sourceFormat: 'pdf', extractionStatus: 'success', extractedText: quote }],
       requirementSource: { snapshotId: sourceId, sourceUrl, documentHash, torVersion: 1 } });
     assert.equal((await (await request('/tors?maxBudget=900000')).json()).pagination.total, 1);
     assert.equal((await (await request('/tors?maxBudget=800000')).json()).pagination.total, 0);
@@ -133,6 +135,63 @@ test('current APIs work with canonical tags, live validators, sessions and polic
     assert.equal(notifications.status, 200);
     assert.equal((await notifications.json()).unreadCount, 1);
     assert.equal((await request('/recommendations')).status, 200);
+    if (process.env.TOR_EVALUATION_TEST_WEBHOOK_URL) {
+      const path = `/tors/${projectId}/evaluation`;
+      assert.equal((await (await request(path)).json()).status, 'missing');
+      const jobs = await Promise.all([request(path, 'POST', { companyId: 'spoofed' }), request(path, 'POST'), request(path, 'POST')]);
+      assert.ok(jobs.every(response => [200, 202].includes(response.status)));
+      const waitForResult = async endpoint => {
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const state = await (await request(endpoint)).json();
+          if (['completed', 'failed'].includes(state.status)) return state;
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        assert.fail('Evaluation did not finish');
+      };
+      const ready = await waitForResult(path);
+      assert.equal(ready.status, 'completed', JSON.stringify(ready));
+      assert.match(ready.evaluation.summary, /Schema API Fixture/);
+      assert.equal(ready.evaluation.priceScore, null);
+      assert.equal(await db.collection('company_tor_evaluations').countDocuments({ projectId, companyId: company._id }), 1);
+      assert.equal((await (await request(path, 'POST')).json()).status, 'completed');
+      const ownerCookie = cookie;
+      const otherRegistration = await request('/auth/register', 'POST', { firstName: 'Other', lastName: 'Company',
+        email: 'other-eval@example.invalid', password: 'Temporary-API-test-123!', termsAccepted: true,
+        company: { mode: 'create', legalName: 'Other Evaluation Company' } });
+      assert.equal(otherRegistration.status, 201);
+      cookie = otherRegistration.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
+      assert.equal((await (await request(path)).json()).status, 'missing');
+      await request(path, 'POST');
+      assert.match((await waitForResult(path)).evaluation.summary, /Other Evaluation Company/);
+      cookie = ownerCookie;
+      assert.match((await (await request(path)).json()).evaluation.summary, /Schema API Fixture/);
+      await db.collection('companies').updateOne({ _id: company._id }, { $set: { description: 'Changed company profile' } });
+      assert.equal((await (await request(path)).json()).status, 'missing');
+      await request(path, 'POST');
+      assert.equal((await waitForResult(path)).status, 'completed');
+      assert.equal(await db.collection('company_tor_evaluations').countDocuments({ projectId, companyId: company._id }), 2);
+      await db.collection('tor_announcements').updateOne({ _id: torId }, { $set: { description: 'Changed TOR scope' } });
+      assert.equal((await (await request(path)).json()).status, 'missing');
+      const noCookie = await fetch(base + path);
+      assert.equal(noCookie.status, 401);
+      for (const [id, expected] of [['sim-error', 'AI_EVALUATION_UPSTREAM'], ['sim-invalid', 'AI_EVALUATION_INVALID'],
+        ['sim-html', 'AI_EVALUATION_INVALID'], ['sim-slow', 'AI_EVALUATION_TIMEOUT']]) {
+        const original = await db.collection('tor_announcements').findOne({ _id: torId });
+        await db.collection('tor_announcements').insertOne({ ...original, _id: new ObjectId(), projectId: id });
+        process.env.TOR_EVALUATION_TIMEOUT_MS = '1000';
+        const endpoint = `/tors/${id}/evaluation`;
+        assert.equal((await request(endpoint, 'POST')).status, 202);
+        const failure = await waitForResult(endpoint);
+        assert.equal(failure.status, 'failed', JSON.stringify(failure));
+        assert.equal(failure.error.code, expected);
+        assert.equal(failure.evaluation, null);
+        if (id === 'sim-error') {
+          assert.equal((await request(endpoint, 'POST')).status, 202);
+          assert.equal((await waitForResult(endpoint)).status, 'failed');
+          assert.equal(await db.collection('company_tor_evaluations').countDocuments({ projectId: id }), 1);
+        }
+      }
+    }
     assert.equal((await request('/auth/logout', 'POST')).status, 200);
     assert.equal((await request('/auth/me')).status, 401);
     assert.equal((await (await request('/auth/session')).json()).user, null);

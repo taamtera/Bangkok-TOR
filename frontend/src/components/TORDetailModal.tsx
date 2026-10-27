@@ -4,7 +4,8 @@ import { useLanguage } from '@/lib/LanguageProvider';
 
 
 import React, { useEffect, useRef, useState } from 'react';
-import { TORContract } from '@/types';
+import { TORContract, SoftwareHouseProfile } from '@/types';
+import { AIEvaluationPanel } from './AIEvaluationPanel';
 import { DocumentPreview } from './PDFReader';
 import { ProjectObservations } from './ProjectObservations';
 import { TORTags } from './TORTags';
@@ -16,11 +17,8 @@ import {
   Calendar, 
   CheckCircle2, 
   XCircle, 
-  Sparkles, 
   FileText, 
   ShieldCheck, 
-  TrendingUp, 
-  AlertTriangle,
   BrainCircuit
 } from 'lucide-react';
 
@@ -29,13 +27,15 @@ interface TORDetailModalProps {
   onClose: () => void;
   onDownloadPDF: (contract: TORContract) => void;
   matchedTagIds?: string[];
+  currentUser?: SoftwareHouseProfile | null;
 }
 
 export const TORDetailModal: React.FC<TORDetailModalProps> = ({
   contract,
   onClose,
   onDownloadPDF,
-  matchedTagIds
+  matchedTagIds,
+  currentUser
 }) => {
   const { t, language } = useLanguage();
   const [activeTab, setActiveTab] = useState<'pdf' | 'ai-eval'>('pdf');
@@ -198,7 +198,7 @@ export const TORDetailModal: React.FC<TORDetailModalProps> = ({
 
           </div>
 
-          {/* View Tab Switcher (PDF Reader vs Vertex AI Evaluation) */}
+          {/* Document preview and company-specific AI evaluation */}
           <ProjectObservations project={contract} />
           <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
             <div className="flex items-center gap-2">
@@ -236,52 +236,7 @@ export const TORDetailModal: React.FC<TORDetailModalProps> = ({
             /* pdf reader container */
             <DocumentPreview contract={contract} onDownload={() => onDownloadPDF(contract)} />
           ) : (
-            /* Vertex AI Evaluation details */
-            <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-lg border border-slate-200 dark:border-slate-800 space-y-5">
-              <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">{t("AI Evaluation Analysis")}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{t("Model:")} {t(contract.aiEvaluation.aiModel)}{t("• Evaluated:")} {contract.aiEvaluation.evaluatedAt}</p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-2xl font-black text-slate-800 dark:text-slate-100">{contract.aiEvaluation.qualificationMatchScore}%</span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block uppercase">{t("Match Confidence")}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <h4 className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <TrendingUp className="w-4 h-4" />
-                    <span>{t("Price & Budget Assessment")}</span>
-                  </h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
-                    {t(contract.aiEvaluation.priceAssessment)}
-                  </p>
-                  <div className="w-full bg-slate-100 dark:bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-200 dark:border-slate-800">
-                    <div className="bg-slate-600 h-full rounded-full" style={{ width: `${contract.aiEvaluation.priceScore}%` }} />
-                  </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <h4 className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                    <span>{t("Risk & Compliance Level")}</span>
-                  </h4>
-                  <div className="inline-block px-2.5 py-0.5 rounded text-xs font-bold mb-2 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                    {t(contract.aiEvaluation.riskLevel)}{t("Risk")} </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                    {t(contract.aiEvaluation.riskAnalysis)}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <AIEvaluationPanel key={contract.projectId} projectId={contract.projectId} currentUser={currentUser} />
           )}
 
         </div>
