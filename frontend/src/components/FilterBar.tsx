@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { FilterState } from '@/types';
 import { DiscoveryFacets } from '@/lib/torApi';
 import { STAGE_LABELS } from '@/lib/discovery';
+import { ANNOUNCEMENT_STAGE_CODES } from '@/lib/torPresentation';
 import { RefreshCw, Search, X } from 'lucide-react';
 interface Props {
  filters: FilterState; setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
@@ -51,7 +52,7 @@ export function FilterBar({filters, setFilters, onResetFilters, departments, met
     {[...departments].sort((a,b) => label(a).localeCompare(label(b),language)).filter(entry => label(entry).toLowerCase().includes(departmentSearch.trim().toLowerCase())).map(entry => <button key={entry.value} className="block w-full text-left p-2 text-sm hover:bg-sky-50 dark:hover:bg-slate-800 rounded" onClick={() => {update('department',entry.value); setOpen(false); setDepartmentSearch('');}}>{label(entry)} <span className="text-slate-400">· {entry.count}</span></button>)}</div><p className="text-xs text-slate-500 p-2">{t("Total project count per department")}</p>
    </div></>}
   </div>
-  <div><label htmlFor="stage" className="block text-xs font-medium text-slate-500 mb-2">{t("Announcement Stage")}</label><select id="stage" className={control} value={filters.status} onChange={e => update('status',e.target.value)}><option value="">{t("All Stages")}</option>{Object.entries(STAGE_LABELS).map(([code,name]) => <option key={code} value={code}>{t(name)}</option>)}</select></div>
+  <div><label htmlFor="stage" className="block text-xs font-medium text-slate-500 mb-2">{t("Announcement Stage")}</label><select id="stage" className={control} value={filters.status} onChange={e => update('status',e.target.value)}><option value="">{t("All Stages")}</option>{ANNOUNCEMENT_STAGE_CODES.map(code => <option key={code} value={code}>{t(STAGE_LABELS[code])}</option>)}</select></div>
   <div><label htmlFor="method" className="block text-xs font-medium text-slate-500 mb-2">{t("Procurement Method")}</label><select id="method" className={control} value={filters.procurementMethod} onChange={e => update('procurementMethod',e.target.value)}><option value="">{t("All Methods")}</option>{[...methods].sort((a,b) => b.count-a.count).map(entry => <option key={entry.value} value={entry.value}>{formatMethod(entry.value)} ({entry.count})</option>)}</select></div>
   <div><label htmlFor="dates" className="block text-xs font-medium text-slate-500 mb-2">{t("Published Date")}</label><select id="dates" className={control} value={filters.datePreset} onChange={e => setFilters(prev => ({...prev,datePreset:e.target.value,fromDate:'',toDate:''}))}><option value="">{t("All Time")}</option>{['7', '30', '90'].map(days => <option key={days} value={days}>{t(`Last ${days} Days`)}</option>)}<option value="custom">{t("Custom Date Range")}</option></select></div>
  </div>

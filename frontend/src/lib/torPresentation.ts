@@ -5,13 +5,14 @@ export const STAGE_STATUS: Record<StageCode, string> = {
   D0: 'invitation_published', W0: 'award_published', D1: 'invitation_cancelled',
   W1: 'award_cancelled', D2: 'invitation_amended', W2: 'award_amended'
 };
-export const ANNOUNCEMENT_STAGE_CODES = Object.keys(STAGE_STATUS) as StageCode[];
+// Explicit order matches the stage filter; numeric object keys would put '15' first.
+export const ANNOUNCEMENT_STAGE_CODES: StageCode[] = ['P0', '15', 'B0', 'D0', 'W0', 'D1', 'W1', 'D2', 'W2'];
 const LABELS: Record<string, string> = {
   procurement_planned: 'Procurement Plan', reference_price_published: 'Reference Price Published',
   draft_tender_published: 'Draft Tender Published', invitation_published: 'Invitation Published',
   award_published: 'Award Published', invitation_cancelled: 'Invitation Cancelled',
   award_cancelled: 'Award Cancelled', invitation_amended: 'Invitation Amended',
-  award_amended: 'Award Amended', multiple_announcements_same_day: 'Multiple announcements',
+  award_amended: 'Award Amended',
   unknown: 'Stage unavailable'
 };
 export function getAnnouncementStage(code: string) {
@@ -21,6 +22,7 @@ export function getStageCode(status?: string | null) {
   return ANNOUNCEMENT_STAGE_CODES.find(code => STAGE_STATUS[code] === status) ?? '';
 }
 export function getStatusLabel(status?: string | null) {
+  if (status === 'multiple_announcements_same_day') return LABELS.unknown;
   return LABELS[status ?? 'unknown'] ?? status ?? LABELS.unknown;
 }
 export function getLatestStageCodes(project: TORContract): StageCode[] {
@@ -29,10 +31,13 @@ export function getLatestStageCodes(project: TORContract): StageCode[] {
     .map(observation => observation?.publishedAt ?? '').sort().at(-1);
   const codes = latestDate ? ANNOUNCEMENT_STAGE_CODES.filter(code => observations[code]?.publishedAt === latestDate) : [];
   const statusCode = getStageCode(project.status) as StageCode;
-  return codes.length ? codes : statusCode ? [statusCode] : [];
+  return codes.length ? codes.slice(-1) : statusCode ? [statusCode] : [];
+}
+export function getProjectStatus(project: TORContract) {
+  const code = getLatestStageCodes(project)[0];
+  return code ? STAGE_STATUS[code] : 'unknown';
 }
 export function matchesStage(project: TORContract, stage: string) {
-  if (stage === 'multiple_announcements_same_day') return project.statusOrderAmbiguous === true;
   return getLatestStageCodes(project).includes(stage as StageCode);
 }
 export function getStatusClasses(status?: string | null) {

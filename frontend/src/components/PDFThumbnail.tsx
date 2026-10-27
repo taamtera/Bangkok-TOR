@@ -5,8 +5,7 @@ import { useLanguage } from '@/lib/LanguageProvider';
 import React, { useEffect, useState } from 'react';
 import { TORContract } from '@/types';
 import { resolveApiUrl } from '@/lib/api';
-import { getStatusClasses, getStatusLabel } from '@/lib/torPresentation';
-import { FileText, ExternalLink, Sparkles } from 'lucide-react';
+import { ExternalLink, Sparkles } from 'lucide-react';
 
 interface PDFThumbnailProps {
   contract: TORContract;
@@ -28,7 +27,7 @@ export const PDFThumbnail: React.FC<PDFThumbnailProps> = ({ contract, className 
     return () => clearInterval(timer);
   }, [contract.projectId, contract.documentUrl]);
 
-  // If a valid image thumbnail is provided and hasn't errored out, render it with PDF badge overlay
+  // Render the document thumbnail when available.
   if (thumbnailUrl && !imageError) {
     return (
       <div className={`relative overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 group/thumb ${className}`}>
@@ -38,12 +37,6 @@ export const PDFThumbnail: React.FC<PDFThumbnailProps> = ({ contract, className 
           onError={() => setImageError(true)}
           className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
         />
-        {/* TOR status overlay */}
-        <div className={`absolute top-2 left-2 px-2 py-0.5 rounded border text-[10px] font-bold tracking-wider flex items-center gap-1 shadow-sm ${getStatusClasses(contract.status)}`}>
-          <FileText className="w-2.5 h-2.5" />
-          <span>{t(getStatusLabel(contract.status))}</span>
-        </div>
-
         {contract.matchedScore && (
           <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-sky-600 text-white rounded-md text-[10px] font-extrabold flex items-center gap-1 shadow-sm">
             <Sparkles className="w-3 h-3" />
@@ -57,12 +50,7 @@ export const PDFThumbnail: React.FC<PDFThumbnailProps> = ({ contract, className 
   // Otherwise, render a realistic official Government PDF Document 1st-Page Sheet Preview
   return (
     <div className={`relative overflow-hidden rounded-md bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 p-2.5 flex flex-col justify-between select-none group/thumb shadow-sm ${className}`}>
-      {/* Top Banner: TOR status & category indicator */}
-      <div className="flex items-center justify-between gap-1 mb-1.5">
-        <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-black uppercase tracking-wider shadow-xs ${getStatusClasses(contract.status)}`}>
-          <FileText className="w-2.5 h-2.5 shrink-0" />
-          <span>{t(getStatusLabel(contract.status))}</span>
-        </div>
+      <div className="flex items-center justify-end gap-1 mb-1.5">
         <span className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[90px]">
           {(contract.departmentName || contract.contractOwner || 'e-GP').split(' ')[0]}
         </span>

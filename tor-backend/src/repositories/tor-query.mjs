@@ -5,6 +5,18 @@ export const STAGE_STATUS = {
   D0: 'invitation_published', W0: 'award_published', D1: 'invitation_cancelled',
   W1: 'award_cancelled', D2: 'invitation_amended', W2: 'award_amended'
 };
+// Keep ties consistent with the stage filter order.
+export const STAGE_ORDER = ['P0', '15', 'B0', 'D0', 'W0', 'D1', 'W1', 'D2', 'W2'];
+const CURRENT_STAGE = { $switch: {
+  branches: [...STAGE_ORDER].reverse().map(code => ({
+    case: { $and: [
+      { $ne: [{ $ifNull: ['$statusPublishedAt', null] }, null] },
+      { $eq: [`$stageObservations.${code}.publishedAt`, '$statusPublishedAt'] }
+    ] },
+    then: STAGE_STATUS[code]
+  })),
+  default: '$status'
+} };
 const SEARCH_FIELDS = ['projectId', 'title', 'description', 'departmentId', 'departmentName'];
 const escapeRegex = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export const VALID_PROJECT_ID_FILTER = Object.freeze({
@@ -43,7 +55,7 @@ export function buildDiscoveryQuery(options = {}) {
   const toDate = date(options.toDate, 'toDate');
   const sort = text(options.sort, 'sort') || (search ? 'relevance' : 'latest');
   if (!['latest', 'retained'].includes(stageScope)) throw httpError(400, 'INVALID_SEARCH_FILTER', 'stageScope is invalid.');
-  if (stage && !Object.hasOwn(STAGE_STATUS, stage) && stage !== 'multiple_announcements_same_day') throw httpError(400, 'INVALID_SEARCH_FILTER', 'stage is invalid.');
+  if (stage && !Object.hasOwn(STAGE_STATUS, stage)) throw httpError(400, 'INVALID_SEARCH_FILTER', 'stage is invalid.');
   if (!['latest', 'oldest', 'relevance'].includes(sort)) throw httpError(400, 'INVALID_SEARCH_FILTER', 'sort is invalid.');
   if (fromDate && toDate && fromDate > toDate) throw httpError(400, 'INVALID_SEARCH_FILTER', 'The start date must not be after the end date.');
 
@@ -53,14 +65,10 @@ export function buildDiscoveryQuery(options = {}) {
   if (procurementMethod === '__unknown__') conditions.push({ $expr: { $in: [{ $ifNull: [METHOD_VALUE, ''] }, ['', null]] } });
   else if (procurementMethod) conditions.push({ $expr: { $eq: [METHOD_VALUE, procurementMethod] } });
   if (fromDate || toDate) conditions.push({ statusPublishedAt: { ...(fromDate ? { $gte: fromDate } : {}), ...(toDate ? { $lte: toDate } : {}) } });
-  if (stage === 'multiple_announcements_same_day') conditions.push({ statusOrderAmbiguous: true });
-  else if (stage) {
+  if (stage) {
     const path = `stageObservations.${stage}`;
     if (stageScope === 'retained') conditions.push({ [path]: { $type: 'object' } });
-    else conditions.push({ $or: [
-      { status: STAGE_STATUS[stage] },
-      { $and: [{ [path]: { $type: 'object' } }, { $expr: { $eq: [`$${path}.publishedAt`, '$statusPublishedAt'] } }] }
-    ] });
+    else conditions.push({ $expr: { $eq: [CURRENT_STAGE, STAGE_STATUS[stage]] } });
   }
   const ranking = search ? { $add: [
     { $cond: [{ $eq: ['$projectId', search] }, 1000, 0] },

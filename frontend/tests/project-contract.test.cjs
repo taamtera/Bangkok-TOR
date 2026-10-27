@@ -42,16 +42,18 @@ test('project mapping preserves source strings and does not recreate removed fie
   assert.throws(() => api.toTorContract({ projectId: 123 }), /Project ID/);
 });
 
-test('same-day stages display and filter individually, excluding older observations', () => {
+test('same-day stages select the last stage in filter order, excluding older observations', () => {
   const project = api.toTorContract({ projectId: '123', status: 'multiple_announcements_same_day',
     statusOrderAmbiguous: true, statusPublishedAt: '2026-10-08', stageObservations: {
       D0: { publishedAt: '2026-10-08' }, W1: { publishedAt: '2026-10-08' }, B0: { publishedAt: '2026-10-01' }
     } });
-  assert.deepEqual(presentation.getLatestStageCodes(project), ['D0', 'W1']);
-  assert.equal(presentation.matchesStage(project, 'D0'), true);
+  assert.deepEqual(presentation.getLatestStageCodes(project), ['W1']);
+  assert.equal(presentation.matchesStage(project, 'D0'), false);
   assert.equal(presentation.matchesStage(project, 'W1'), true);
   assert.equal(presentation.matchesStage(project, 'B0'), false);
-  assert.equal(presentation.matchesStage(project, 'multiple_announcements_same_day'), true);
+  assert.equal(presentation.matchesStage(project, 'multiple_announcements_same_day'), false);
+  assert.equal(presentation.getProjectStatus(project), 'award_cancelled');
+  assert.deepEqual(presentation.ANNOUNCEMENT_STAGE_CODES.slice(0, 3), ['P0', '15', 'B0']);
   assert.equal(presentation.getStatusLabel('invitation_published'), 'Invitation Published');
   assert.deepEqual(presentation.getLatestStageCodes(api.toTorContract({ projectId: 'missing' })), []);
 });

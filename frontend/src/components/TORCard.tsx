@@ -15,8 +15,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { PDFThumbnail } from './PDFThumbnail';
-import { ProjectStages } from './ProjectStages';
-import { getStatusClasses, getStatusLabel } from '@/lib/torPresentation';
+import { getStatusClasses, getStatusLabel, getProjectStatus } from '@/lib/torPresentation';
 
 interface TORCardProps {
   contract: TORContract;
@@ -51,13 +50,12 @@ export const TORCard: React.FC<TORCardProps> = ({ contract, onSelect }) => {
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
               {procurementMethodLabel(contract.category, language)}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">{t("Status:")} <span className={`px-2 py-0.5 rounded-md border font-semibold ${getStatusClasses(contract.status)}`}>
-                {t(getStatusLabel(contract.status))}
+            <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">{t("Status:")} <span className={`px-2 py-0.5 rounded-md border font-semibold ${getStatusClasses(getProjectStatus(contract))}`}>
+                {t(getStatusLabel(getProjectStatus(contract)))}
               </span>
             </span>
           </div>
 
-          <ProjectStages project={contract} />
           <h3 className="text-base md:text-lg font-bold text-slate-900 dark:text-white group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors line-clamp-2 leading-snug mb-2">
             {contract.title}
           </h3>
@@ -121,8 +119,8 @@ export const TORCard: React.FC<TORCardProps> = ({ contract, onSelect }) => {
 
         <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[11px]">
           <span className="text-slate-500 dark:text-slate-400">{t("TOR status:")}</span>
-          <span className={`px-2 py-0.5 rounded-md border font-semibold ${getStatusClasses(contract.status)}`}>
-            {t(getStatusLabel(contract.status))}
+          <span className={`px-2 py-0.5 rounded-md border font-semibold ${getStatusClasses(getProjectStatus(contract))}`}>
+            {t(getStatusLabel(getProjectStatus(contract)))}
           </span>
         </div>
       </div>}

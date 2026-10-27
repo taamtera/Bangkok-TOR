@@ -7,7 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { TORContract } from '@/types';
 import { DocumentPreview } from './PDFReader';
 import { ProjectObservations } from './ProjectObservations';
-import { getStatusClasses, getStatusLabel } from '@/lib/torPresentation';
+import { getStatusClasses, getStatusLabel, getProjectStatus } from '@/lib/torPresentation';
 import { 
   X, 
   Download, 
@@ -103,7 +103,7 @@ export const TORDetailModal: React.FC<TORDetailModalProps> = ({
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-slate-500 dark:text-slate-400">{t("Announcement")}</dt>
-                    <dd className="font-semibold text-slate-800 dark:text-slate-200 text-right">{t(getStatusLabel(contract.status))}</dd>
+                    <dd className="font-semibold text-slate-800 dark:text-slate-200 text-right">{t(getStatusLabel(getProjectStatus(contract)))}</dd>
                   </div>
                 </dl>
               </div>
@@ -125,8 +125,8 @@ export const TORDetailModal: React.FC<TORDetailModalProps> = ({
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                     {procurementMethodLabel(contract.category, language)}
                   </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">{t("Status:")} <span className={`px-2 py-0.5 rounded-md border font-semibold ${getStatusClasses(contract.status)}`}>
-                      {t(getStatusLabel(contract.status))}
+                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">{t("Status:")} <span className={`px-2 py-0.5 rounded-md border font-semibold ${getStatusClasses(getProjectStatus(contract))}`}>
+                      {t(getStatusLabel(getProjectStatus(contract)))}
                     </span>
                   </span>
                 </div>
@@ -144,7 +144,7 @@ export const TORDetailModal: React.FC<TORDetailModalProps> = ({
 
                 <div className="flex flex-wrap gap-2 mb-3 text-xs">
                   <span className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    {t(getStatusLabel(contract.status))}
+                    {t(getStatusLabel(getProjectStatus(contract)))}
                   </span>
                   <span className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">{t("Published:")} {contract.publishedAt || contract.postingDate}
                   </span>

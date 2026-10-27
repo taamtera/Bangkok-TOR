@@ -13,8 +13,6 @@ export function ProjectStages({ project }: { project: TORContract }) {
           {t(getAnnouncementStage(code))}
         </span>
       ))}
-      {/* Same-day announcements can be published together, e.g. reference price
-          and invitation. Show each observed stage without an ordering warning. */}
     </div>
   );
 }

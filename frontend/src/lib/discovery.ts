@@ -10,8 +10,7 @@ export const STAGE_LABELS: Record<string, string> = {
   D1: "Invitation Cancelled",
   W1: "Award Cancelled",
   D2: "Invitation Amended",
-  W2: "Award Amended",
-  multiple_announcements_same_day: "Multiple Announcements Same Day"
+  W2: "Award Amended"
 };
 export function dateRange(preset: string, now = new Date()) {
   const today = new Date(now.getTime() + 7 * 3600000).toISOString().slice(0, 10);

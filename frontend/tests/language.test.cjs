@@ -47,6 +47,7 @@ const { FilterBar } = load('components/FilterBar.tsx');
 const { Header } = load('components/Header.tsx');
 const { AuthModal } = load('components/AuthModal.tsx');
 const { DocumentPreview } = load('components/PDFReader.tsx');
+const { ProjectStages } = load('components/ProjectStages.tsx');
 const { ProjectObservations } = load('components/ProjectObservations.tsx');
 const { ContractorServices } = load('components/ContractorServices.tsx');
 const { companyDataToProfile, profileToCompanyData } = load('lib/userProfile.ts');
@@ -128,27 +129,26 @@ test('stage badges and detail labels translate without changing source announcem
   assert.equal(procurementMethodLabel('เฉพาะเจาะจง', 'th'), 'เฉพาะเจาะจง');
 });
 
-test('reference price and invitation published together render normally in cards and details', () => {
+test('reference price and invitation published together select invitation in cards and details', () => {
   const project = toTorContract({ projectId: '00123', title: 'Concurrent announcements',
     status: 'multiple_announcements_same_day', statusOrderAmbiguous: true,
     statusPublishedAt: '2026-10-09', stageObservations: {
       '15': { publishedAt: '2026-10-09' }, D0: { publishedAt: '2026-10-09' },
       B0: { publishedAt: '2026-10-01' }
     } });
-  for (const [component, props] of [[TORCard, { contract: project, onSelect() {} }], [ProjectObservations, { project }]]) {
+  for (const [component, props] of [[TORCard, { contract: project, onSelect() {} }], [ProjectStages, { project }]]) {
     const en = render('en', component, props);
     const th = render('th', component, props);
-    assert.match(en, /Reference Price Published/);
+    assert.doesNotMatch(en, /Reference Price Published/);
     assert.match(en, /Invitation Published/);
-    assert.match(th, /เผยแพร่ราคากลาง/);
+    assert.doesNotMatch(th, /เผยแพร่ราคากลาง/);
     assert.match(th, /ประกาศเชิญชวน/);
     for (const html of [en, th]) {
-      assert.doesNotMatch(html, /order unknown|ไม่ทราบลำดับ/);
+      assert.doesNotMatch(html, /Multiple announcements|multiple_announcements_same_day|order unknown|ไม่ทราบลำดับ/);
     }
   }
-  assert.match(render('en', TORCard, { contract: project, onSelect() {} }), /Multiple announcements/);
-  assert.match(render('th', TORCard, { contract: project, onSelect() {} }), /หลายประกาศ/);
 });
+
 
 test('registration dialog has separate English and Thai labels', () => {
   const props = { isOpen: true, mode: 'signin', onClose() {}, onSuccess() {} };
