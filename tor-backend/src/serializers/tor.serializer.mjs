@@ -4,7 +4,7 @@ import { normalizeTorDocuments } from '../models/tor-document.mjs';
 
 // Source identities are strings; MongoDB _id remains internal.
 export function serializeTor(tor) {
-  const { _id, templateId, projectKey, announcementType, ...project } = tor;
+  const { _id, templateId, projectKey, announcementType, matchingVersion, matchingRequirements, ...project } = tor;
   const projectId = typeof tor.projectId === 'string' ? tor.projectId : null;
   const result = {
     ...project, projectId,

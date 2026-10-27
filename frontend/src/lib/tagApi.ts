@@ -84,6 +84,8 @@ export async function reviewTorSuggestion(projectId: string, suggestionId: strin
   });
 }
 
-export async function createTag(input: Pick<ControlledTag, 'name' | 'category'> & { aliases: string[]; description: string }) {
-  return request<{ tag: ControlledTag }>('/api/tags', { method: 'POST', body: JSON.stringify(input) });
+export async function createTag(input: Pick<ControlledTag, 'name' | 'category'> & { aliases: string[]; description: string; type?: string }) {
+  const type = input.type || (['certification', 'skill', 'industry', 'capability', 'requirement'].includes(input.category)
+    ? 'contractor_requirement' : 'specification');
+  return request<{ tag: ControlledTag }>('/api/tags', { method: 'POST', body: JSON.stringify({ ...input, text: input.name, type }) });
 }

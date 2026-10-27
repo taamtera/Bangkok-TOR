@@ -10,6 +10,7 @@ test('notification persistence, ownership, duplicate prevention and read control
   const { connectDatabase, closeDatabase } = await import('../src/config/database.mjs');
   const { createRegisteredUser, updateUserStatus } = await import('../src/repositories/user.repository.mjs');
   const { publishMatchNotifications } = await import('../src/repositories/notification.repository.mjs');
+  const { createSession } = await import('../src/repositories/session.repository.mjs');
   const { signAccessToken } = await import('../src/utils/tokens.mjs');
   const { app } = await import('../src/app.mjs');
   const db = await connectDatabase();
@@ -20,6 +21,7 @@ test('notification persistence, ownership, duplicate prevention and read control
     if (fixtureIds.length) {
       await db.collection('notifications').deleteMany({ userId: { $in: fixtureIds } });
       await db.collection('users').deleteMany({ _id: { $in: fixtureIds } });
+      await db.collection('sessions').deleteMany({ userId: { $in: fixtureIds } });
     }
     await closeDatabase();
   });
@@ -31,7 +33,8 @@ test('notification persistence, ownership, duplicate prevention and read control
       passwordHash:'test-only-not-a-login-hash',firstName:'Notification',lastName:'Fixture',companyId:company});
     fixtureIds.push(created._id);
     await updateUserStatus(created._id, 'active');
-    return created;
+    const session = await createSession({ userId: created._id, refreshTokenHash: String(new ObjectId()).repeat(2), expiresAt: new Date(Date.now() + 60000) });
+    return { ...created, sessionId: session._id };
   }
   const owner = await fixture(companyId), optedOut = await fixture(companyId), stranger = await fixture(new ObjectId());
   await db.collection('users').updateOne({_id:optedOut._id},{$set:{'notificationPreferences.channels':['email']}});
@@ -43,7 +46,7 @@ test('notification persistence, ownership, duplicate prevention and read control
   server = await new Promise(resolve => { const listener = app.listen(0,'127.0.0.1',()=>resolve(listener)); });
   const base = `http://127.0.0.1:${server.address().port}/api/notifications`;
   async function request(user,path='',method='GET') {
-    const headers = user ? {cookie:`tor_access=${signAccessToken({sub:String(user._id),companyId:String(user.companyId),role:'company_admin'})}`} : {};
+    const headers = user ? {cookie:`tor_access=${signAccessToken({sub:String(user._id),companyId:String(user.companyId),role:'company_admin',sid:String(user.sessionId)})}`} : {};
     return fetch(base+path,{headers,method});
   }
   assert.equal((await request(null)).status,401);

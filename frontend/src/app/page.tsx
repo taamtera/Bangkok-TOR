@@ -12,7 +12,6 @@ import * as authApi from '@/lib/authApi';
 import * as companyProfileApi from '@/lib/companyProfileApi';
 import { saveCompanyAssignments } from '@/lib/tagApi';
 import * as torApi from '@/lib/torApi';
-import * as recommendationApi from '@/lib/aiRecommendationApi';
 import { companyDataToProfile, profileToCompanyData, safeUserToProfile } from '@/lib/userProfile';
 import { Header } from '@/components/Header';
 import { DashboardHero } from '@/components/DashboardHero';
@@ -22,8 +21,6 @@ import { TORCard } from '@/components/TORCard';
 import { TORDetailModal } from '@/components/TORDetailModal';
 import { AuthModal } from '@/components/AuthModal';
 import { SoftwareHouseProfileModal } from '@/components/SoftwareHouseProfileModal';
-import { ContractorServices } from '@/components/ContractorServices';
-import { AIRecommendationView } from '@/components/AIRecommendationView';
 import { MatchingResultsView } from '@/components/MatchingResultsView';
 import { NotificationInbox } from '@/components/NotificationInbox';
 import * as notificationApi from '@/lib/notificationApi';
@@ -32,8 +29,6 @@ import { resolveApiUrl } from '@/lib/api';
 import { 
   Sparkles, 
   Layers, 
-  Bot, 
-  CheckCircle2, 
   Search,
   RefreshCw
 } from 'lucide-react';
@@ -58,36 +53,12 @@ export default function Home() {
   };
 
   // State Management
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'find' | 'recommendations' | 'profile' | 'matching-setup'>('find');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'find' | 'matching-setup'>('find');
   const [currentUser, setCurrentUser] = useState<SoftwareHouseProfile | null>(null);
   const [contracts, setContracts] = useState<TORContract[]>([]);
   const [isLoadingTors, setIsLoadingTors] = useState(true);
   const [torLoadError, setTorLoadError] = useState<string | null>(null);
   const [torRefreshKey, setTorRefreshKey] = useState(0);
-  const [recommendations, setRecommendations] = useState<recommendationApi.RecommendationItem[]>([]);
-  const [recommendationLoading, setRecommendationLoading] = useState(false);
-  const [recommendationError, setRecommendationError] = useState<string | null>(null);
-  const [recommendationStatus, setRecommendationStatus] = useState<recommendationApi.RecommendationResponse['status']>('not_configured');
-
-  useEffect(() => {
-    if (activeTab !== 'recommendations' || !currentUser) return;
-    const controller = new AbortController();
-    setRecommendationLoading(true);
-    setRecommendations([]);
-    setRecommendationError(null);
-    recommendationApi.getRecommendations(controller.signal).then((result) => {
-      if (controller.signal.aborted) return;
-      setRecommendations(result.items);
-      setRecommendationStatus(result.status);
-      setRecommendationError(null);
-    }).catch((error) => {
-      if (!controller.signal.aborted) setRecommendationError((error as Error).message);
-    }).finally(() => {
-      if (!controller.signal.aborted) setRecommendationLoading(false);
-    });
-    return () => controller.abort();
-  }, [activeTab, currentUser?.id]);
-
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -241,7 +212,6 @@ export default function Home() {
   const handleLogout = async () => {
     // Clear local state immediately; revoke the session/cookies on the backend.
     setCurrentUser(null);
-    setRecommendations([]);
     setActiveTab('dashboard');
     try {
       await authApi.logout();
@@ -389,6 +359,7 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
                     <TORCard
                       key={contract.id}
                       contract={contract}
+                      matchedTagIds={(currentUser?.tags ?? []).map(tag => tag.tagId)}
                       onSelect={(c) => setSelectedContract(c)}
                     />
                   ))}
@@ -419,77 +390,11 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
           </div>
         )}
 
-        {/* VIEW 3: RECOMMENDATION TAB (Desktop - data) */}
-        {activeTab === 'recommendations' && (
-          currentUser ? (
-            <AIRecommendationView
-              recommendations={recommendations}
-              status={recommendationStatus}
-              isLoading={recommendationLoading}
-              error={recommendationError}
-              onViewMatches={() => setActiveTab('matching-setup')}
-              onSelectProject={(projectId) => {
-                torApi.getTor(projectId).then((tor) => setSelectedContract(torApi.toTorContract(tor)))
-                  .catch((error) => setRecommendationError((error as Error).message));
-              }}
-            />
-          ) : (
-            <div className="theme-card p-10 text-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 my-8 shadow-sm">
-              <Bot className="w-16 h-16 text-sky-600 dark:text-sky-400 mx-auto mb-4" />
-              <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">{t("Log in to view recommendations")}</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-2 mb-6">{t("Log in to see AI project recommendations for your company.")} </p>
-              <button
-                onClick={() => handleOpenAuth('login')}
-                className="px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-sm text-sm transition-all"
-              >{t("Log In / Sign Up")} </button>
-            </div>
-          )
-        )}
-
         {activeTab === 'matching-setup' && currentUser && <MatchingResultsView
           currentUser={currentUser}
           onSelectContract={(contract) => setSelectedContract(contract)}
           onEditProfile={() => setProfileModalOpen(true)}
-          onViewRecommendations={() => setActiveTab('recommendations')}
         />}
-
-        {/* VIEW 4: PROFILE TAB (Desktop - data profile) */}
-        {activeTab === 'profile' && (
-          currentUser ? (
-            <div className="theme-card p-6 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-6 shadow-sm">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-4">
-                  <img src={currentUser.avatar} alt={currentUser.companyName} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-sky-500/50" />
-                  <div>
-                    <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">{currentUser.companyName}</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{t("Tax ID:")} {currentUser.taxId} • {currentUser.district}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setProfileModalOpen(true)}
-                  className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-xs shadow-sm"
-                >{t("Edit qualifications")} </button>
-              </div>
-
-              <div>
-                <ContractorServices tags={currentUser.tags ?? []} />
-                <h3 className="mt-6 text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">{t("Company qualifications")} </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {currentUser.properties.map((prop, idx) => (
-                    <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
-                      <span>{prop}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <button onClick={() => handleOpenAuth('login')} className="px-6 py-3 bg-sky-600 text-white font-bold rounded-xl">{t("Log In / Sign Up")} </button>
-            </div>
-          )
-        )}
 
       </main>
 
@@ -507,6 +412,7 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
       {/* MODAL 1: TOR Detail & PDF Reader (Desktop - 2) */}
       <TORDetailModal
         contract={contracts.find(project => project.projectId === selectedContract?.projectId) ?? selectedContract}
+        matchedTagIds={(currentUser?.tags ?? []).map(tag => tag.tagId)}
         onClose={() => setSelectedContract(null)}
         onDownloadPDF={handleDownloadPDF}
       />

@@ -89,3 +89,27 @@ export function buildDiscoveryQuery(options = {}) {
       : { statusPublishedAt: sort === 'oldest' ? 1 : -1, projectId: 1 }
   };
 }
+
+export function pagination(page = 1, limit = 20) {
+  const values = [page, limit].map(Number);
+  if (!Number.isSafeInteger(values[0]) || values[0] < 1 || values[0] > 100000
+    || !Number.isSafeInteger(values[1]) || values[1] < 1 || values[1] > 100) {
+    throw httpError(400, 'INVALID_SEARCH_FILTER', 'page must be a positive integer and limit must be between 1 and 100.');
+  }
+  return { page: values[0], limit: values[1] };
+}
+
+export function budgetConditions(minBudget, maxBudget) {
+  const parse = value => {
+    if (value == null || value === '') return null;
+    if (!['number', 'string'].includes(typeof value) || !String(value).trim()) throw httpError(400, 'INVALID_SEARCH_FILTER', 'Budget bounds must be non-negative numbers.');
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || amount < 0) throw httpError(400, 'INVALID_SEARCH_FILTER', 'Budget bounds must be non-negative numbers.');
+    return amount;
+  };
+  const min = parse(minBudget), max = parse(maxBudget);
+  if (min != null && max != null && min > max) throw httpError(400, 'INVALID_SEARCH_FILTER', 'minBudget must not exceed maxBudget.');
+  const amount = { $ifNull: ['$budget.maxAmount', '$budget.minAmount'] };
+  return [ ...(min != null ? [{ $expr: { $and: [{ $isNumber: amount }, { $gte: [amount, min] }] } }] : []),
+    ...(max != null ? [{ $expr: { $and: [{ $isNumber: amount }, { $lte: [amount, max] }] } }] : []) ];
+}

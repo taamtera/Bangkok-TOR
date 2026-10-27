@@ -38,6 +38,11 @@ export async function findActiveSession(refreshTokenHash) {
   });
 }
 
+export async function findActiveSessionById(sessionId, userId) {
+  return sessions().findOne({ _id: toObjectId(sessionId, 'sessionId'), userId: toObjectId(userId, 'userId'),
+    status: 'active', revokedAt: null, expiresAt: { $gt: new Date() } });
+}
+
 export async function rotateSession(sessionId, currentHash, nextHash, nextExpiresAt) {
   return sessions().findOneAndUpdate(
     {

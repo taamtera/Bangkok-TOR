@@ -16,7 +16,7 @@ import {
   revokeAllUserSessions,
   revokeSession,
   rotateSession,
-  setCompanyCreator,
+  setCompanyOwner,
   updateUserStatus
 } from '../repositories/index.mjs';
 import { toSafeUser } from '../serializers/user.serializer.mjs';
@@ -144,7 +144,7 @@ export async function register(input, context) {
     throw error;
   }
 
-  await setCompanyCreator(company._id, createdUser._id);
+  await setCompanyOwner(company._id, createdUser._id);
   // Email verification is disabled: activate the account immediately.
   const activated = await updateUserStatus(createdUser._id, 'active');
   const user = activated ?? { ...createdUser, status: 'active' };

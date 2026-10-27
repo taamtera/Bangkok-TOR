@@ -9,14 +9,15 @@ import {
   LogOut, 
   Bell, 
   Layers,
+  Globe,
   Sun,
   Moon
 } from 'lucide-react';
 import { SoftwareHouseProfile } from '@/types';
 
 interface HeaderProps {
-  activeTab: 'dashboard' | 'find' | 'recommendations' | 'profile' | 'matching-setup';
-  setActiveTab: (tab: 'dashboard' | 'find' | 'recommendations' | 'profile' | 'matching-setup') => void;
+  activeTab: 'dashboard' | 'find' | 'matching-setup';
+  setActiveTab: (tab: 'dashboard' | 'find' | 'matching-setup') => void;
   currentUser: SoftwareHouseProfile | null;
   onOpenAuth: (mode: 'login' | 'signin') => void;
   onLogout: () => void;
@@ -125,48 +126,25 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <button
-            onClick={() => setActiveTab('recommendations')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all relative ${
-              activeTab === 'recommendations'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-slate-700'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>{t("AI recommendations")}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              if (currentUser) {
-                onOpenProfile();
-              } else {
-                onOpenAuth('login');
-              }
-            }}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
-              activeTab === 'profile'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-slate-700'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>{t("Company Profile")}</span>
-          </button>
         </nav>
 
         {/* Right side controls */}
         <div className="shrink-0 flex items-center gap-3">
-          <select
-            aria-label={t('Language')}
-            value={language}
-            onChange={event => setLanguage(event.target.value as 'en' | 'th')}
-            className="theme-input rounded-lg px-2 py-2 text-xs font-semibold"
+          <div
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 focus-within:ring-2 focus-within:ring-sky-500 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+            title={t('Language')}
           >
-            <option value="en" lang="en">English</option>
-            <option value="th" lang="th">ไทย</option>
-          </select>
+            <Globe className="h-4 w-4 pointer-events-none" aria-hidden="true" />
+            <select
+              aria-label={t('Language')}
+              value={language}
+              onChange={event => setLanguage(event.target.value as 'en' | 'th')}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            >
+              <option value="en" lang="en">English</option>
+              <option value="th" lang="th">ไทย</option>
+            </select>
+          </div>
           
           {/* Theme Switcher */}
           <button

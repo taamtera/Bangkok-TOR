@@ -15,7 +15,7 @@ export function errorHandler(error, request, response, next) {
   }
 
   const status = Number.isInteger(error.status) ? error.status : 500;
-  const code = error.code || 'INTERNAL_SERVER_ERROR';
+  const code = typeof error.code === 'string' ? error.code : 'INTERNAL_SERVER_ERROR';
   const message = status >= 500 ? 'The server could not complete the request.' : error.message;
 
   if (status >= 500) {

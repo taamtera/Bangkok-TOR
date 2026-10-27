@@ -1,14 +1,15 @@
 import { getDatabase } from '../config/database.mjs';
 import { ObjectId } from 'mongodb';
+import { httpError } from '../utils/http-error.mjs';
 import { toObjectId } from '../utils/object-id.mjs';
 import { assertActiveTagIds } from './tag.repository.mjs';
-import { buildDiscoveryQuery, METHOD_VALUE, VALID_PROJECT_ID_FILTER } from './tor-query.mjs';
+import { buildDiscoveryQuery, METHOD_VALUE, VALID_PROJECT_ID_FILTER, pagination, budgetConditions } from './tor-query.mjs';
 
 function tors() {
   return getDatabase().collection('tor_announcements');
 }
 
-async function withTorTagLabels(items) {
+export async function withTorTagLabels(items) {
   const ids = [...new Set(items.flatMap(tor => (tor.tagAssignments || [])
     .map(assignment => String(assignment?.tagId || ''))))].filter(id => ObjectId.isValid(id));
   if (!ids.length) return items;
@@ -61,8 +62,10 @@ export async function listTors({
   page = 1,
   limit = 20
 } = {}) {
-  const safePage = Math.max(1, Number.parseInt(page, 10) || 1);
-  const safeLimit = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
+  const { page: safePage, limit: safeLimit } = pagination(page, limit);
+  for (const [field, value] of Object.entries({ status, category, sourceId, organizationId, deadlineAfter })) {
+    if (value != null && typeof value !== 'string') throw httpError(400, 'INVALID_SEARCH_FILTER', `${field} must be text.`);
+  }
   const discovery = buildDiscoveryQuery({ search, departmentId, stage, stageScope, procurementMethod, fromDate, toDate, sort });
   const filter = discovery.filter;
 
@@ -92,15 +95,11 @@ export async function listTors({
     filter['organization.organizationId'] = toObjectId(organizationId, 'organizationId');
   }
 
-  if (minBudget !== null) {
-    filter['budget.maxAmount'] = { ...(filter['budget.maxAmount'] || {}), $gte: Number(minBudget) };
-  }
-
-  if (maxBudget !== null) {
-    filter['budget.minAmount'] = { ...(filter['budget.minAmount'] || {}), $lte: Number(maxBudget) };
-  }
+  const budgetFilters = budgetConditions(minBudget, maxBudget);
+  if (budgetFilters.length) filter.$and = [...(filter.$and || []), ...budgetFilters];
 
   if (deadlineAfter) {
+    if (Number.isNaN(Date.parse(deadlineAfter))) throw httpError(400, 'INVALID_SEARCH_FILTER', 'deadlineAfter must be a valid date.');
     filter.submissionDeadline = { $gte: new Date(deadlineAfter) };
   }
 

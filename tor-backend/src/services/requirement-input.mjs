@@ -2,9 +2,15 @@ import { env } from '../config/env.mjs';
 import { conceptForTag } from './tag-catalog.mjs';
 
 function storedTagRequirements(tor, tagsById) {
-  return (tor.tagAssignments || []).filter((assignment) => ['required', 'preferred', 'mentioned', 'informational'].includes(assignment.requirementLevel)
+  const weights = { required: 3, preferred: 1, mentioned: 1, informational: 0 };
+  const unique = new Map();
+  for (const assignment of (tor.tagAssignments || []).filter((assignment) => ['required', 'preferred', 'mentioned', 'informational'].includes(assignment.requirementLevel)
     && typeof assignment.evidence === 'string' && assignment.evidence.trim()
-    && tagsById.has(assignment.tagId?.toString())).map((assignment, index) => ({
+    && tagsById.has(assignment.tagId?.toString()))) {
+    const id = String(assignment.tagId), previous = unique.get(id);
+    if (!previous || weights[assignment.requirementLevel] > weights[previous.requirementLevel]) unique.set(id, assignment);
+  }
+  return [...unique.values()].map((assignment, index) => ({
       key: `tag-${assignment.tagId}-${index}`, tagId: assignment.tagId.toString(),
       text: tagsById.get(assignment.tagId.toString()).name,
       importance: assignment.requirementLevel, sourceType: 'stored_tag_requirement',

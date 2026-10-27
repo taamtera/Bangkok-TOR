@@ -115,11 +115,11 @@ policy-3 records, remains optional for historical records, and is never exposed
 as AI output. Zero and unavailable results overwrite previously positive results
 for the same company/TOR/version, preventing stale matches after profile edits.
 
-For the existing test database, run `node src/matching-storage-migration.mjs`
-from the backend folder or API container. This idempotent migration removes
-only `recommendation` from that collection's required validator fields. It is
-restricted to `tor_software_test` and preserves all other validation settings.
-Fresh database setup uses the updated `setup-database.mjs` definition.
+Use `npm run schema:check` to inspect the configured database and
+`npm run schema:apply` to align policy-3 storage. The command backs up the existing
+validator and source-index metadata, removes only `recommendation` from required
+match fields, and ensures source snapshot uniqueness. It does not rewrite records.
+Fresh database setup already uses the policy-3 definition.
 
 Docker includes Python and the matching directory. Local backend execution needs
 Python available on PATH or `MATCHING_PYTHON_EXECUTABLE` set to its full path.

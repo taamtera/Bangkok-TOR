@@ -67,15 +67,6 @@ export async function createRegisteredUser({
   return { ...document, _id: result.insertedId };
 }
 
-export async function markEmailVerified(userId) {
-  const now = new Date();
-  return users().findOneAndUpdate(
-    { _id: toObjectId(userId, 'userId'), status: 'pending_verification', deletedAt: null },
-    { $set: { status: 'active', emailVerifiedAt: now, updatedAt: now } },
-    { returnDocument: 'after' }
-  );
-}
-
 export async function updateUserStatus(userId, status) {
   const allowedStatuses = ['pending_verification', 'active', 'suspended', 'disabled'];
 

@@ -34,7 +34,7 @@ test('contractor labels are trimmed, optional for older clients, and editable in
 
 test('catalog responses expose contractorLabel without inventing values or changing identity', () => {
   const tag = { _id: 'existing_tag_id', text: 'Internet Service', category: 'technology', type: 'specification' };
-  assert.deepEqual(serializeTag(tag), { ...tag, contractorLabel: null });
+  assert.deepEqual(serializeTag(tag), { ...tag, name: tag.text, contractorLabel: null });
   assert.equal(serializeTag({ ...tag, contractorLabel: 'Internet Service Provider' }).contractorLabel, 'Internet Service Provider');
   assert.equal(serializeTag(null), null);
   assert.equal(Object.hasOwn(tag, 'contractorLabel'), false);

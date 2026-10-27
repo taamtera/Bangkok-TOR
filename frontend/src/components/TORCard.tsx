@@ -21,9 +21,10 @@ import { getStatusClasses, getStatusLabel, getProjectStatus } from '@/lib/torPre
 interface TORCardProps {
   contract: TORContract;
   onSelect: (contract: TORContract) => void;
+  matchedTagIds?: string[];
 }
 
-export const TORCard: React.FC<TORCardProps> = ({ contract, onSelect }) => {
+export const TORCard: React.FC<TORCardProps> = ({ contract, onSelect, matchedTagIds }) => {
   const { t, language } = useLanguage();
   return (
     <div 
@@ -71,7 +72,7 @@ export const TORCard: React.FC<TORCardProps> = ({ contract, onSelect }) => {
               <span>{t("Published:")} {contract.statusPublishedAt || contract.publishedAt || contract.postingDate}</span>
             </div>
           </div>
-          <TORTags contract={contract} />
+          <TORTags contract={contract} matchedTagIds={matchedTagIds} />
         </div>
 
         {/* Price Tag */}

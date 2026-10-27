@@ -1,31 +1,16 @@
 import { createHash } from 'node:crypto';
+import { findOrCreateCatalogTag } from '../repositories/tag.repository.mjs';
 import { getDatabase, startDatabaseSession } from '../config/database.mjs';
 import { httpError } from '../utils/http-error.mjs';
 import { toObjectId } from '../utils/object-id.mjs';
-import { coreTagForName, normalizeTagName } from './tag-catalog.mjs';
 import { validateAiRequirements, validateTagEvidence } from './ai-requirement-validation.mjs';
 import { refreshTorRequirementMatches } from './requirement-matching.service.mjs';
 
 async function resolveTag(db, requested, quote, session) {
   let tag;
   if (requested.tagId) tag = await db.collection('tags').findOne({ _id: toObjectId(requested.tagId, 'tagId') }, { session });
-  else {
-    const core = coreTagForName(requested.name);
-    const name = core?.name || requested.name; const category = core?.category || requested.category;
-    const normalizedName = normalizeTagName(name);
-    const existing = await db.collection('tags').find({ category }, { session }).toArray();
-    tag = existing.find((item) => [item.name, ...(item.aliases || [])].some((alias) => normalizeTagName(alias) === normalizeTagName(requested.name)));
-    if (!tag) {
-      const now = new Date();
-      tag = await db.collection('tags').findOneAndUpdate({ category, normalizedName }, {
-        $setOnInsert: { name, text: name, category, normalizedName, contractorLabel: requested.contractorLabel ?? null, aliases: core?.aliases || [name],
-          ...(core ? { conceptKey: core.conceptKey } : {}),
-          slug: `auto-${createHash('sha256').update(`${category}:${normalizedName}`).digest('hex').slice(0, 20)}`,
-          status: 'active', createdAt: now, updatedAt: now, createdByUserId: null,
-          description: 'Created from a source-cited requirement; not a company verification.' }
-      }, { session, upsert: true, returnDocument: 'after' });
-    }
-  }
+  else tag = await findOrCreateCatalogTag({ name: requested.name, category: requested.category,
+    contractorLabel: requested.contractorLabel, source: 'ai' }, { session });
   validateTagEvidence(tag, quote); return tag;
 }
 

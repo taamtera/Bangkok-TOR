@@ -28,12 +28,14 @@ interface TORDetailModalProps {
   contract: TORContract | null;
   onClose: () => void;
   onDownloadPDF: (contract: TORContract) => void;
+  matchedTagIds?: string[];
 }
 
 export const TORDetailModal: React.FC<TORDetailModalProps> = ({
   contract,
   onClose,
-  onDownloadPDF
+  onDownloadPDF,
+  matchedTagIds
 }) => {
   const { t, language } = useLanguage();
   const [activeTab, setActiveTab] = useState<'pdf' | 'ai-eval'>('pdf');
@@ -154,7 +156,7 @@ export const TORDetailModal: React.FC<TORDetailModalProps> = ({
                   </span>
                 </div>
 
-                <TORTags contract={contract} />
+                <TORTags contract={contract} matchedTagIds={matchedTagIds} />
 
                 {/* Contract period and project budget */}
                 <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 dark:text-slate-300 mb-4 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">

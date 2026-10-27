@@ -38,13 +38,8 @@ export async function listCompaniesForMatching() {
   return companies().find({}).toArray();
 }
 
-export async function findActiveTagsByIds(ids) {
-  if (ids.length === 0) return [];
-  return tags().find({ _id: { $in: ids }, status: 'active' }).toArray();
-}
-
 export async function listActiveTagsForMatching() {
-  const catalog = await tags().find({ status: 'active' }).toArray();
+  const catalog = await tags().find({ status: { $ne: 'inactive' }, matchingExcluded: { $ne: true } }).toArray();
   return catalog.map((tag) => ({ ...tag, name: tag.text || tag.name }));
 }
 
@@ -72,12 +67,4 @@ export async function saveCompanyMatches(records) {
       upsert: true
     }
   })), { ordered: false });
-}
-
-export async function listCompanyMatches(companyId, torIds) {
-  if (torIds.length === 0) return [];
-  return matches().find({
-    companyId: toObjectId(companyId, 'companyId'),
-    torId: { $in: torIds }
-  }).toArray();
 }

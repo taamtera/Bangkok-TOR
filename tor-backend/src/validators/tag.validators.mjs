@@ -51,7 +51,7 @@ function validateAssignments(body, levelField, allowedLevels) {
       invalid(`assignments[${index}] must be an object.`);
     }
 
-    const tagId = requiredString(assignment.tagId, `assignments[${index}].tagId`);
+    const tagId = requiredString(assignment.tagId, `assignments[${index}].tagId`).toLowerCase();
     if (seenTagIds.has(tagId)) {
       invalid('The same tag cannot be assigned more than once.');
     }
@@ -149,7 +149,7 @@ export function validateTorTagSuggestions(body) {
     if (!suggestion || typeof suggestion !== 'object' || Array.isArray(suggestion)) {
       invalid(`suggestions[${index}] must be an object.`);
     }
-    const tagId = requiredString(suggestion.tagId, `suggestions[${index}].tagId`);
+    const tagId = requiredString(suggestion.tagId, `suggestions[${index}].tagId`).toLowerCase();
     const requirementLevel = suggestion.requirementLevel;
     if (!TOR_REQUIREMENT_LEVELS.includes(requirementLevel)) {
       invalid(`suggestions[${index}].requirementLevel is invalid.`);

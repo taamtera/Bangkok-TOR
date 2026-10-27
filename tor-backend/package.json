@@ -8,7 +8,10 @@
     "start": "node src/server.mjs",
     "check": "node scripts/check-source.mjs",
     "test": "node --test",
-    "verify:repositories": "node scripts/verify-repositories.mjs"
+    "verify:repositories": "node scripts/verify-repositories.mjs",
+    "schema:check": "node scripts/align-matching-schema.mjs",
+    "schema:apply": "node scripts/align-matching-schema.mjs --apply",
+    "test:db": "node scripts/run-database-checks.mjs"
   },
   "engines": {
     "node": ">=24"

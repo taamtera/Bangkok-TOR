@@ -1,5 +1,5 @@
 import { httpError } from '../utils/http-error.mjs';
-import { normalizeTagName, phraseInText, isFlaggedTagName } from './tag-catalog.mjs';
+import { normalizeTagName, phraseInText, isFlaggedTagName, tagText } from './tag-catalog.mjs';
 import { TAG_CATEGORIES } from '../validators/tag.validators.mjs';
 
 function invalid(message, code = 'INVALID_AI_REQUIREMENTS') { throw httpError(422, code, message); }
@@ -41,6 +41,6 @@ export function validateAiRequirements(body, source) {
 }
 
 export function validateTagEvidence(tag, quote) {
-  if (!tag || tag.status !== 'active' || tag.matchingExcluded || isFlaggedTagName(tag.name)) invalid('The selected tag is not active or is flagged.', 'AI_TAG_NOT_AVAILABLE');
-  if (![tag.name, ...(tag.aliases || [])].some((name) => phraseInText(quote, name))) invalid(`The quotation does not support tag ${tag.name}.`, 'AI_TAG_EVIDENCE_MISMATCH');
+  if (!tag || tag.status === 'inactive' || tag.matchingExcluded || isFlaggedTagName(tagText(tag))) invalid('The selected tag is not active or is flagged.', 'AI_TAG_NOT_AVAILABLE');
+  if (![tagText(tag), ...(tag.aliases || [])].some((name) => phraseInText(quote, name))) invalid(`The quotation does not support tag ${tagText(tag)}.`, 'AI_TAG_EVIDENCE_MISMATCH');
 }

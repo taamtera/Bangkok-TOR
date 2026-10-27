@@ -53,17 +53,3 @@ export async function consumeAuthToken({ type, tokenHash }) {
   );
 }
 
-export async function revokeUserAuthTokens(userId, type = null) {
-  const filter = {
-    userId: toObjectId(userId, 'userId'),
-    usedAt: null,
-    revokedAt: null
-  };
-
-  if (type) {
-    filter.type = type;
-  }
-
-  return authTokens().updateMany(filter, { $set: { revokedAt: new Date() } });
-}
-

@@ -2,8 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ObjectId } from 'mongodb';
 import { validateAiRequirements, validateTagEvidence } from '../src/services/ai-requirement-validation.mjs';
-import { coreTagForName, normalizeTagName, remapTagReferences } from '../src/services/tag-catalog.mjs';
-import { planCatalogCleanup } from '../src/tag-catalog-migration.mjs';
+import { coreTagForName, normalizeTagName } from '../src/services/tag-catalog.mjs';
 import { allowedRequirementUrl, fetchRequirementPdf, extractPdfPages } from '../src/services/requirement-source.mjs';
 import { authenticateAiWorker } from '../src/middleware/authenticate-ai-worker.mjs';
 import { prepareMatchingTors } from '../src/services/requirement-input.mjs';
@@ -33,6 +32,17 @@ test('stored TOR tags are matching requirements regardless of review stage', asy
     assert.equal(item.status, 'compared');
     assert.equal(item.requirementMatches[0].status, 'met');
   }
+});
+
+test('review metadata cannot cause a repeated stored tag to inflate requirement weight', () => {
+  const tagId = new ObjectId();
+  const tor = { _id: new ObjectId(), tagAssignments: [
+    { tagId, requirementLevel: 'preferred', evidence: 'Suggested evidence', reviewStatus: 'suggested' },
+    { tagId, requirementLevel: 'required', evidence: 'Required evidence', reviewStatus: 'approved' }
+  ] };
+  const [prepared] = prepareMatchingTors([tor], [{ _id: tagId, text: 'Docker' }], new Map(), []);
+  assert.equal(prepared.matchingRequirements.length, 1);
+  assert.equal(prepared.matchingRequirements[0].importance, 'required');
 });
 
 const source = { _id: new ObjectId(), torVersion: 1, pages: [{ page: 1, text: 'The contractor must deliver microservices using Docker or Kubernetes.' }] };
@@ -84,16 +94,6 @@ test('catalog aliases map profiles without accepting the ISO typo or a negative 
   assert.equal(coreTagForName('ISO 270001', { profile: true }), null);
   assert.equal(coreTagForName('No Docker experience', { profile: true }), null);
   assert.equal(normalizeTagName('  Ｄｏｃｋｅｒ  '), 'docker');
-});
-test('catalog cleanup preserves references and original evidence', () => {
-  const a = new ObjectId('000000000000000000000001'), b = new ObjectId('000000000000000000000002');
-  const plan = planCatalogCleanup([{ _id: a, name: 'Docker', category: 'technology', aliases: ['docker'], slug: 'docker' },
-    { _id: b, name: ' Docker ', category: 'technology', aliases: ['container tool'], slug: 'docker' }]);
-  assert.equal(plan.duplicates.length, 1); assert.deepEqual(plan.updates[0].aliases, ['docker', 'container tool']);
-  const original = { companyId: b, tagAssignments: [{ tagId: b, evidence: 'Original profile claim' }], clauses: [{ anyOfTagIds: [b, a] }] };
-  const changed = remapTagReferences(original, plan.mapping);
-  assert.equal(String(changed.companyId), String(b)); assert.equal(String(changed.tagAssignments[0].tagId), String(a));
-  assert.equal(changed.tagAssignments[0].evidence, original.tagAssignments[0].evidence); assert.equal(changed.clauses[0].anyOfTagIds.length, 1);
 });
 test('unsupported hosts and redirects cannot be used as AI source documents', async () => {
   assert.equal(allowedRequirementUrl('https://127.0.0.1/private'), null);

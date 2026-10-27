@@ -7,9 +7,11 @@ import { validateTorUpdate } from '../validators/tor.validators.mjs';
 import { refreshTorRequirementMatches as refreshMatchesForTor } from '../services/requirement-matching.service.mjs';
 
 export async function list(request, response) {
-  const tagIds = request.query.tagIds
-    ? (Array.isArray(request.query.tagIds) ? request.query.tagIds : request.query.tagIds.split(',')).filter(Boolean)
-    : [];
+  const rawTags = request.query.tagIds;
+  if (rawTags != null && typeof rawTags !== 'string' && !(Array.isArray(rawTags) && rawTags.every(value => typeof value === 'string'))) {
+    throw httpError(400, 'INVALID_SEARCH_FILTER', 'tagIds must be a comma-separated string or repeated text values.');
+  }
+  const tagIds = rawTags ? (Array.isArray(rawTags) ? rawTags : rawTags.split(',')).filter(Boolean) : [];
   const result = await listTors({ ...request.query, tagIds });
   response.json({ ...result, items: result.items.map(serializeTor) });
 }

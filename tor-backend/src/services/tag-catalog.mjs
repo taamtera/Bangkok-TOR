@@ -24,20 +24,12 @@ export function coreTagForName(name, { profile = false } = {}) {
   return coreTags.find((tag) => tag.aliases.some((alias) => normalizeTagName(alias) === normalized))
     || (profile ? coreTags.find((tag) => tag.aliases.some((alias) => phraseInText(name, alias))) : null) || null;
 }
+export function tagText(tag) { return tag?.text ?? tag?.name ?? ''; }
+export function tagTypeForCategory(category) {
+  return ['certification', 'skill', 'industry', 'capability', 'requirement'].includes(category) ? 'contractor_requirement' : 'specification';
+}
 export function conceptForTag(tag) {
-  return tag.conceptKey || coreTagForName(tag.name)?.conceptKey || `catalog:${normalizeTagName(tag.name)}`;
+  const name = tagText(tag);
+  return tag.conceptKey || coreTagForName(name)?.conceptKey || `catalog:${normalizeTagName(name)}`;
 }
 export function isFlaggedTagName(name) { return /\biso[\s/-]*(?:iec[\s/-]*)?270001\b/iu.test(name); }
-
-// Remap only tag-reference fields, leaving account IDs, source text and evidence untouched.
-export function remapTagReferences(value, mapping, key = '') {
-  if (key === 'tagId' && mapping.has(String(value))) return mapping.get(String(value));
-  if (['tagIds', 'anyOfTagIds'].includes(key) && Array.isArray(value)) return [...new Map(value.map((id) => {
-    const replacement = mapping.get(String(id)) || id; return [String(replacement), replacement];
-  })).values()];
-  if (Array.isArray(value)) return value.map((entry) => remapTagReferences(entry, mapping));
-  if (value && typeof value === 'object' && !value._bsontype && !(value instanceof Date)) {
-    return Object.fromEntries(Object.entries(value).map(([field, entry]) => [field, remapTagReferences(entry, mapping, field)]));
-  }
-  return value;
-}

@@ -29,7 +29,7 @@ The backend loads its own `tor-backend/.env` automatically. Shell or deployment 
 - Safe 404 and server-error responses
 - Graceful server and database shutdown
 - Reusable repositories for users, secure tokens, sessions, audit logs, companies, and TOR discovery
-- Controlled tag catalog and reviewed TOR/company tag assignments
+- Canonical tag catalog (`text`, `category`, `type`), TOR annotations regardless of review stage, and evidence-bearing company assignments
 
 ## TOR API
 
@@ -82,14 +82,14 @@ metadata, not proof of a company's capabilities or a TOR assignment's requiremen
 level. Updating it preserves the tag ID and existing references. No MongoDB schema
 migration or bulk guessing of contractor labels is required.
 
-Project discovery accepts `search` (all whitespace-separated terms, literal case-insensitive substrings across project ID, title, description, department ID and name), `departmentId`, `procurementMethod`, `stage`, `stageScope=latest|retained`, `fromDate`, `toDate`, and `sort=latest|oldest|relevance`. Dates use inclusive `YYYY-MM-DD` bounds on `statusPublishedAt`. Latest-stage filtering includes each stage tied on the latest publication day. Retained-stage filtering considers the latest stored observation of each stage, not a complete announcement history. `__unknown__` selects missing departments or methods. Project and department IDs remain strings.
+Project discovery accepts `search` (all whitespace-separated terms, literal case-insensitive substrings across project ID, title, description, department ID and name), `departmentId`, `procurementMethod`, `stage`, `stageScope=latest|retained`, `fromDate`, `toDate`, and `sort=latest|oldest|relevance`. Dates use inclusive `YYYY-MM-DD` bounds on `statusPublishedAt`. Latest-stage filtering resolves ties by the stage filter order (`P0`, `15`, `B0`, `D0`, `W0`, `D1`, `W1`, `D2`, `W2`) and selects the last observed stage in that order. Retained-stage filtering considers the latest stored observation of each stage, not a complete announcement history. `__unknown__` selects missing departments or methods. Project and department IDs remain strings.
 
 `page` and `limit` select a result page. Responses also include `totalAllProjects` and global `facets.departments` (`value`, `name`, `count`) and `facets.methods` (`value`, `count`). Facet counts describe the whole collection, rather than the filtered page. Relevance prioritizes exact IDs, followed by title and department matches; it is not an AI compatibility score.
 
 - `GET /api/tags`: list active tags; accepts `category` and `search` query parameters
 - `POST /api/tags`: create a controlled tag; system administrator only
 - `GET /api/tags/:tagId`: read a tag, including inactive tags; system administrator only
-- `PATCH /api/tags/:tagId`: update a tag's text/name, category, type, contractor label, aliases, description, or active status; system administrator only. The tag slug remains stable.
+- `PATCH /api/tags/:tagId`: update a tag's text/name, category, type, contractor label, aliases, description, or active status; system administrator only. Tags use `category + text` as the canonical unique key. Legacy `name` remains an input/response alias; writes no longer create `slug` or `normalizedName`.
 - `DELETE /api/tags/:tagId`: deactivate a tag; system administrator only. Tags are not physically deleted because companies and TORs may reference them.
 - `PUT /api/tags/companies/:companyId`: replace a company's approved tags; company member or system administrator
 - `PUT /api/tags/tors/:projectId`: replace a TOR's approved tags; project manager or system administrator
@@ -149,3 +149,21 @@ The exact registration fields, statuses, endpoint names, token policy, and team 
 ## Docker
 
 The backend image installs production dependencies only, runs as a non-root user, and contains no `.env` file or database credentials. Start it through the repository-level `docker-compose.yml` so health checks and the crawler worker are configured together.
+
+## Database compatibility checks
+
+- `npm run verify:repositories`: read-only discovery, catalog and match-validator checks against the configured database; no demonstration account is required.
+- `npm run schema:check`: preview the narrow matching-storage compatibility migration.
+- `npm run schema:apply`: back up metadata, remove the obsolete required `recommendation` field from `company_matches`, and ensure unique requirement source snapshots. Existing documents and other validators are preserved.
+- `npm run test:db`: exercise registration, catalog CRUD, discovery/budget filters, AI requirement ingestion, profile/matching, notifications and session revocation in disposable databases. Source validators and unique indexes are copied; source records are not modified.
+- `python -m unittest discover -s matching -p 'test_*.py'`: current policy-3 scoring tests.
+
+New companies store `ownerUserId` and `memberUserIds`. Protected APIs read the current
+user role/membership and require an active, unexpired session; stale access cookies
+cannot bypass logout or account suspension. Registration signs the user in immediately;
+email verification routes are not part of the current API.
+
+The retired policy-2 JavaScript engine, its compatibility facade/text heuristic,
+and test-only catalog/matching migration scripts have been removed. Policy-3 Python
+matching is the only scoring implementation. Existing TOR tag review metadata is
+preserved for inspection but does not gate display, tag filtering or matching.

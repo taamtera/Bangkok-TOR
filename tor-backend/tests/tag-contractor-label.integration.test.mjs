@@ -10,7 +10,7 @@ test('catalog label persists through create, PATCH, search, legacy reads, and pr
   process.env.MONGODB_DB_NAME = `contractor_label_test_${randomUUID().replaceAll('-', '')}`;
   process.env.NODE_ENV = 'test';
   const { connectDatabase, closeDatabase } = await import('../src/config/database.mjs');
-  const { createControlledTag, updateControlledTag, listControlledTags, findControlledTagById, findOrCreateProfileTag } = await import('../src/repositories/tag.repository.mjs');
+  const { createControlledTag, updateControlledTag, listControlledTags, findControlledTagById, findOrCreateCatalogTag } = await import('../src/repositories/tag.repository.mjs');
   const { validateCreateTag, validateUpdateTag } = await import('../src/validators/tag.validators.mjs');
   const { createCompany, updateCompanyProfile, findCompanyProfileById } = await import('../src/repositories/company.repository.mjs');
   const { validateCompanyProfile } = await import('../src/validators/company.validators.mjs');
@@ -36,13 +36,13 @@ test('catalog label persists through create, PATCH, search, legacy reads, and pr
     assert.equal(legacyUpdated.contractorLabel, 'Legacy Service Provider');
     assert.equal(legacyUpdated.text, 'Legacy Service');
     assert.equal(Object.hasOwn(legacyUpdated, 'normalizedName'), false);
-    const reused = await findOrCreateProfileTag({ name: 'Legacy Service', category: 'technology', contractorLabel: 'Do not replace the existing label' });
+    const reused = await findOrCreateCatalogTag({ name: 'Legacy Service', category: 'technology', contractorLabel: 'Do not replace the existing label' });
     assert.equal(String(reused._id), String(legacyId));
     assert.equal(reused.contractorLabel, 'Legacy Service Provider');
     assert.equal((await updateControlledTag(created._id.toString(), validateUpdateTag({ contractorLabel: null }))).contractorLabel, null);
-    const profileTag = await findOrCreateProfileTag({ name: 'Example consulting', category: 'capability' });
+    const profileTag = await findOrCreateCatalogTag({ name: 'Example consulting', category: 'capability' });
     assert.equal(profileTag.contractorLabel, null);
-    const suppliedProfileTag = await findOrCreateProfileTag({ name: 'Example hosting', category: 'capability', contractorLabel: 'Hosting Provider' });
+    const suppliedProfileTag = await findOrCreateCatalogTag({ name: 'Example hosting', category: 'capability', contractorLabel: 'Hosting Provider' });
     assert.equal(suppliedProfileTag.contractorLabel, 'Hosting Provider');
 
     await updateControlledTag(created._id.toString(), { contractorLabel: 'Internet Service Provider' });

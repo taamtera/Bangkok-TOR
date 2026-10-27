@@ -1,7 +1,7 @@
 import { getDatabase } from '../config/database.mjs';
 import { toObjectId } from '../utils/object-id.mjs';
 import { companyProfileTagEntries, mergeQualifications } from '../utils/company-profile.mjs';
-import { assertActiveTagIds, findOrCreateProfileTag } from './tag.repository.mjs';
+import { assertActiveTagIds, findOrCreateCatalogTag } from './tag.repository.mjs';
 
 function companies() {
   return getDatabase().collection('companies');
@@ -13,7 +13,7 @@ export async function createCompany({
   taxId = null,
   companySize = null,
   district = null,
-  createdByUserId = null
+  ownerUserId = null
 }) {
   const now = new Date();
   const document = {
@@ -29,8 +29,8 @@ export async function createCompany({
     qualifications: [],
     tags: [],
     verificationStatus: 'unverified',
-    createdByUserId: createdByUserId ? toObjectId(createdByUserId, 'createdByUserId') : null,
-    memberCount: 1,
+    ownerUserId: ownerUserId ? toObjectId(ownerUserId, 'ownerUserId') : null,
+    memberUserIds: ownerUserId ? [toObjectId(ownerUserId, 'ownerUserId')] : [],
     updatedAt: now,
     createdAt: now
   };
@@ -39,10 +39,11 @@ export async function createCompany({
   return { ...document, _id: result.insertedId };
 }
 
-export async function setCompanyCreator(companyId, userId) {
+export async function setCompanyOwner(companyId, userId) {
   return companies().updateOne(
     { _id: toObjectId(companyId, 'companyId') },
-    { $set: { createdByUserId: toObjectId(userId, 'userId'), updatedAt: new Date() } }
+    { $set: { ownerUserId: toObjectId(userId, 'userId'), updatedAt: new Date() },
+      $addToSet: { memberUserIds: toObjectId(userId, 'userId') } }
   );
 }
 
@@ -111,7 +112,7 @@ export async function syncCompanyProfileTagAssignments(companyId) {
   const profileAssignments = [];
   const profileTagIds = new Set();
   for (const entry of companyProfileTagEntries(company.technologies, company.qualifications)) {
-    const tag = await findOrCreateProfileTag(entry);
+    const tag = await findOrCreateCatalogTag(entry);
     if (!tag) continue; // Respect catalog deactivation; never silently re-enable it.
     if (profileTagIds.has(String(tag._id))) continue;
     profileTagIds.add(String(tag._id));

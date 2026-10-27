@@ -29,7 +29,7 @@ Company legal names and non-empty display names must contain at least 2 characte
 
 When `company.mode` is `create`, the first user becomes `company_admin` and the company starts as `unverified`. Joining an existing company must use a valid company invitation token instead of accepting an arbitrary `companyId` from the browser.
 
-The backend must normalize email addresses, hash the password, create the user with `pending_verification`, create an email-verification token, and record a registration audit event.
+The backend normalizes email addresses, hashes the password, creates the company and user, activates the account immediately, records registration, and issues HTTP-only access/refresh cookies. Email verification is disabled. Company ownership uses `ownerUserId` and `memberUserIds`; user membership uses `users.companyId`.
 
 ## Safe User Response
 
@@ -46,7 +46,7 @@ The backend must normalize email addresses, hash the password, create the user w
   },
   "companyId": "MongoDB ObjectId as a string",
   "role": "company_admin",
-  "status": "pending_verification",
+  "status": "active",
   "emailVerifiedAt": null
 }
 ```
@@ -81,8 +81,6 @@ The frontend may hide unavailable actions, but Express must enforce every permis
 | Method and path | Purpose |
 | --- | --- |
 | `POST /api/auth/register` | Register user and create or join a company |
-| `POST /api/auth/verify-email` | Consume an email-verification token |
-| `POST /api/auth/resend-verification` | Replace the previous verification token |
 | `POST /api/auth/login` | Verify credentials and create a session |
 | `POST /api/auth/refresh` | Rotate the refresh session and access token |
 | `POST /api/auth/logout` | Revoke the current session and clear cookies |
@@ -90,6 +88,7 @@ The frontend may hide unavailable actions, but Express must enforce every permis
 | `POST /api/auth/forgot-password` | Create and email a password-reset token |
 | `POST /api/auth/reset-password` | Change the password and revoke all sessions |
 | `GET /api/auth/me` | Return the safe current-user response |
+| `GET /api/auth/session` | Return the current user, or null when no active session exists |
 
 Forgot-password requests must return the same response whether the email exists or not.
 
@@ -146,3 +145,5 @@ Expected codes include `VALIDATION_ERROR`, `INVALID_CREDENTIALS`, `ACCOUNT_LOCKE
 - Cookie names and frontend URL configuration
 - Acceptance tests for registration, login, reset, logout, and suspended accounts
 
+
+Protected routes verify the signed access cookie, active database session, and active user record. Roles and company membership come from the current user record, so revocation and suspension take effect immediately.

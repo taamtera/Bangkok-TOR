@@ -14,11 +14,10 @@ const STATUS_STYLE = { met: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950
   informational: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
   unassessed: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200' };
 
-export function MatchingResultsView({ currentUser, onSelectContract, onEditProfile, onViewRecommendations }: {
+export function MatchingResultsView({ currentUser, onSelectContract, onEditProfile }: {
   currentUser: SoftwareHouseProfile;
   onSelectContract: (contract: TORContract) => void;
   onEditProfile: () => void;
-  onViewRecommendations: () => void;
 }) {
   const { t } = useLanguage();
   const [result, setResult] = useState<MatchingResponse | null>(null);
@@ -62,7 +61,7 @@ export function MatchingResultsView({ currentUser, onSelectContract, onEditProfi
       {item.dataMode === 'demo' ? <div className="theme-card rounded-xl border border-slate-200 p-5 dark:border-slate-800">
         <h2 className="text-lg font-semibold">{item.contract.title}</h2>
         <p className="mt-2 text-sm text-slate-500">{item.tor.projectId} · {item.contract.departmentName}</p>
-      </div> : <TORCard contract={item.contract} onSelect={onSelectContract} />}
+      </div> : <TORCard contract={item.contract} onSelect={onSelectContract} matchedTagIds={(currentUser.tags ?? []).map(tag => tag.tagId)} />}
       <section className="theme-card space-y-4 rounded-xl border border-slate-200 p-5 dark:border-slate-800">
         <p className="text-sm text-slate-600 dark:text-slate-300">{t('Coverage compares the wording of your profile and the requirements. Self-reported capabilities are not independently verified.')}</p>
         {item.dataMode === 'demo' && <p className="text-sm text-amber-800 dark:text-amber-200">{t('These requirements are examples for testing and are not official tender requirements.')}</p>}
@@ -83,6 +82,5 @@ export function MatchingResultsView({ currentUser, onSelectContract, onEditProfi
       <span>{page} / {result.pagination.totalPages}</span>
       <button disabled={loading || page >= result.pagination.totalPages} onClick={() => setPage((value) => value + 1)} className="theme-input rounded-lg px-3 py-2 disabled:opacity-50">{t('Next')}</button>
     </nav>}
-    <button onClick={onViewRecommendations} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white">{t('View AI recommendations')}</button>
   </div>;
 }

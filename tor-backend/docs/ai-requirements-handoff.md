@@ -112,13 +112,15 @@ HTTPS outside localhost. Give the teammate a deployment secret through a private
 channel, not this document. This key grants extraction routes only; it is not a
 human administrator account or a company-data credential.
 
-Before activating against the existing test database, run the backend's
-`node src/tag-catalog-migration.mjs` to preview, then append `--apply` to merge.
-The migration is restricted to `tor_software_test`, saves a BSON-preserving backup,
-archives duplicates and remaps tag references before adding unique indexes and
-the shared catalog. Set `CATALOG_BACKUP_DIR` to a durable private backup folder.
-Use the normal database setup script for a fresh deployment; do not run this
-test-only migration against the original database.
+The backend uses the canonical catalog key `category + text` and always supplies
+`type` for newly created tags. Existing simplified tags are reusable without
+`name`, `slug`, or `normalizedName`. The old test-only catalog merge migration
+was removed because it recreated retired unique indexes. Use `npm run schema:check`
+and, when needed, `npm run schema:apply` for matching validator/source index alignment.
+
+Run `npm run test:db` to verify the routes against a disposable database using the
+configured database's validators and unique indexes. Tests create no records in
+the source database and delete their generated databases on completion.
 
 Your teammate still needs to add: the AI PDF interpretation worker, its queue and
 retry policy, extraction accuracy evaluation, OCR/other-source adapters if needed,

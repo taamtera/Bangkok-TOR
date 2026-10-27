@@ -65,6 +65,7 @@ function validateBudget(value) {
       continue;
     }
     if (['minAmount', 'maxAmount'].includes(field)) {
+      if (value[field] === null) { budget[field] = null; continue; }
       if (typeof value[field] !== 'number' || !Number.isFinite(value[field]) || value[field] < 0) {
         invalid(`budget.${field} must be a non-negative number.`);
       }
@@ -73,6 +74,7 @@ function validateBudget(value) {
     }
     budget[field] = optionalText(value[field], `budget.${field}`);
   }
+  if (budget.minAmount != null && budget.maxAmount != null && budget.minAmount > budget.maxAmount) invalid('budget.minAmount must not exceed budget.maxAmount.');
   return budget;
 }
 
@@ -96,7 +98,7 @@ export function validateTorUpdate(body) {
     }
   }
   if (body.publishedAt !== undefined) {
-    if (typeof body.publishedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.publishedAt) || Number.isNaN(Date.parse(body.publishedAt))) invalid('publishedAt must be YYYY-MM-DD.');
+    if (typeof body.publishedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.publishedAt) || Number.isNaN(Date.parse(body.publishedAt)) || new Date(body.publishedAt).toISOString().slice(0, 10) !== body.publishedAt) invalid('publishedAt must be YYYY-MM-DD.');
     update.publishedAt = body.publishedAt;
   }
   for (const field of ['submissionDeadline', 'projectStartAt', 'projectEndAt']) {

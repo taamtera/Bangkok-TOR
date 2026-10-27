@@ -1,5 +1,7 @@
 import { findCompanyForMatching, findLatestTorVersions, listActiveTagsForMatching,
   listCompaniesForMatching, listRequirementEvaluations, listTorsForMatching, saveCompanyMatches } from '../repositories/match.repository.mjs';
+import { pagination } from '../repositories/tor-query.mjs';
+import { withTorTagLabels } from '../repositories/tor.repository.mjs';
 import { serializeTor } from '../serializers/tor.serializer.mjs';
 import { httpError } from '../utils/http-error.mjs';
 import { toObjectId } from '../utils/object-id.mjs';
@@ -13,7 +15,7 @@ async function context(tors = null) {
   const [tags, versions, evaluations] = await Promise.all([
     listActiveTagsForMatching(), findLatestTorVersions(ids), listRequirementEvaluations(ids)
   ]);
-  return { activeTags: tags, tors: prepareMatchingTors(projects, tags, versions, evaluations) };
+  return { activeTags: tags, tors: prepareMatchingTors(await withTorTagLabels(projects), tags, versions, evaluations) };
 }
 
 function companyInput(company) {
@@ -48,6 +50,9 @@ async function calculate(companies, source) {
 
 export async function getCompanyMatches(companyId, { page = 1, limit = 20, projectId } = {}) {
   if (!companyId) throw httpError(403, 'COMPANY_REQUIRED', 'A company profile is required to view matches.');
+  const requested = pagination(page, limit);
+  const safePage = requested.page, safeLimit = Math.min(50, requested.limit);
+  if (projectId != null && typeof projectId !== 'string') throw httpError(400, 'INVALID_SEARCH_FILTER', 'projectId must be text.');
   const company = await findCompanyForMatching(companyId);
   if (!company) throw httpError(404, 'COMPANY_NOT_FOUND', 'The company does not exist.');
   const source = await context();
@@ -56,8 +61,6 @@ export async function getCompanyMatches(companyId, { page = 1, limit = 20, proje
   const compared = records.filter((record) => record.status === 'compared'
     && (!projectId || torsById.get(record.torId.toString()).projectId === projectId));
   compared.sort((a, b) => b.score - a.score || String(a.torId).localeCompare(String(b.torId)));
-  const safePage = Math.max(1, Number.parseInt(page, 10) || 1);
-  const safeLimit = Math.min(50, Math.max(1, Number.parseInt(limit, 10) || 20));
   return {
     resultType: 'requirement_match', engine: 'python-rules', policyVersion: 3,
     items: compared.slice((safePage - 1) * safeLimit, safePage * safeLimit).map((record) => {

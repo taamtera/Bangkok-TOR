@@ -1,6 +1,8 @@
 import * as authService from '../services/auth.service.mjs';
 import { ACCESS_COOKIE, clearAuthCookies, parseCookies, REFRESH_COOKIE, setAuthCookies } from '../utils/cookies.mjs';
 import { sha256, verifyAccessToken } from '../utils/tokens.mjs';
+import { authenticatedUser } from '../middleware/authenticate.mjs';
+import { toSafeUser } from '../serializers/user.serializer.mjs';
 import {
   validateEmailOnly,
   validateLogin,
@@ -85,8 +87,8 @@ export async function session(request, response) {
   }
 
   try {
-    const { user } = await authService.getCurrentUser(claims.sub);
-    response.json({ user });
+    const user = await authenticatedUser(claims);
+    response.json({ user: user ? toSafeUser(user) : null });
   } catch {
     response.json({ user: null });
   }
