@@ -11,6 +11,8 @@ export function toCompanyProfile(company) {
   if (!company) return null;
   return {
     displayName: company.displayName ?? company.legalName ?? '',
+    description: company.description ?? '',
+    certifications: Array.isArray(company.certifications) ? company.certifications : [],
     companySize: company.companySize === 'Not specified' ? '' : (company.companySize ?? ''),
     district: company.district ?? '',
     contactEmail: company.contact?.email ?? '',

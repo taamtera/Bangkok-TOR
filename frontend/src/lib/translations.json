@@ -1,4 +1,8 @@
 {
+  "Company description": "รายละเอียดบริษัท",
+  "Qualifications": "คุณสมบัติ",
+  "Certifications": "ใบรับรอง",
+  "Enter one item per line.": "ระบุหนึ่งรายการต่อบรรทัด",
   "Tags": "แท็ก",
   "No tags available": "ยังไม่มีแท็ก",
   "Contractor services": "บริการของผู้รับจ้าง",

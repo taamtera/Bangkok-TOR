@@ -4,6 +4,8 @@ import type { CompanyCatalogTag } from '@/types';
 
 export interface CompanyProfileData {
   displayName: string;
+  description?: string;
+  certifications?: string[];
   companySize: string;
   district: string;
   contactEmail: string;

@@ -90,6 +90,8 @@ export async function updateCompanyProfile(companyId, profile) {
     {
       $set: {
         displayName: profile.displayName,
+        ...(Object.hasOwn(profile, 'description') ? { description: profile.description } : {}),
+        ...(Object.hasOwn(profile, 'certifications') ? { certifications: profile.certifications } : {}),
         companySize: profile.companySize,
         district: profile.district,
         technologies: profile.technologies,

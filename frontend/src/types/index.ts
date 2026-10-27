@@ -105,6 +105,8 @@ export interface SoftwareHouseProfile {
   name: string;
   email: string;
   companyName: string;
+  description?: string;
+  qualifications?: string[];
   taxId: string;
   avatar: string;
   companySize: string;

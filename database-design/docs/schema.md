@@ -259,6 +259,8 @@ Stores the software-house profile used for requirement matching and future AI ev
 Important fields:
 
 - legal and display names, company size, district, and contact data
+- `description`: optional company overview, up to 2,000 characters
+- `certifications`: optional list of up to 100 self-reported certificate names, up to 200 characters each
 - `technologies`: bounded list such as Next.js, Node.js, MongoDB, and Google Cloud
 - `qualifications`: certification, capability, and experience evidence
 - `profileCompleteness`: profile completion percentage, separate from requirement coverage

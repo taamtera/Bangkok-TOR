@@ -43,8 +43,20 @@ test('company serialization exposes profile values without leaking tag or owners
     tagAssignments: [{ tagId: 'internal' }], ownerUserId: 'internal'
   }), {
     displayName: 'Display Name', companySize: '', district: '', contactEmail: 'contact@example.com',
-    technologies: ['Docker'], qualifications: ['ISO'], tags: []
+    technologies: ['Docker'], qualifications: ['ISO'], tags: [], description: '', certifications: []
   });
+});
+
+test('company description and certifications are validated without clearing omitted fields', () => {
+  const base = { displayName: 'Company', technologies: [], qualifications: [] };
+  const result = validateCompanyProfile({ ...base, description: '  About our company\nSecond line  ',
+    certifications: [' ISO 27001 ', 'iso 27001', 'ISO 9001'] });
+  assert.equal(result.description, 'About our company\nSecond line');
+  assert.deepEqual(result.certifications, ['ISO 27001', 'ISO 9001']);
+  assert.equal(Object.hasOwn(validateCompanyProfile(base), 'description'), false);
+  assert.equal(Object.hasOwn(validateCompanyProfile(base), 'certifications'), false);
+  for (const value of [42, {}, 'a'.repeat(2001)]) assert.throws(() => validateCompanyProfile({ ...base, description: value }));
+  assert.deepEqual(validateCompanyProfile({ ...base, description: null, certifications: [] }).certifications, []);
 });
 
 test('company profile accepts only catalog tag references, deduplicates IDs, and preserves omitted links', () => {

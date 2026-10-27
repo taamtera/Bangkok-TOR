@@ -116,8 +116,13 @@ test('current APIs work with canonical tags, live validators, sessions and polic
     assert.equal((await repeated.json()).unchanged, true);
     await db.collection('users').updateOne({ _id: user._id }, { $set: { role: 'company_admin' } });
     const profile = await request('/companies/me', 'PUT', { displayName: 'Schema API Fixture', companySize: '',
-      district: '', contactEmail: '', technologies: ['Docker', 'server installation'], qualifications: [], tags: [{ tagId: String(canonicalId) }] });
+      district: '', contactEmail: '', technologies: ['Docker', 'server installation'], qualifications: ['Government project delivery'],
+      description: 'Company description\nWith two lines.', certifications: ['ISO 27001', 'ISO 9001'], tags: [{ tagId: String(canonicalId) }] });
     assert.equal(profile.status, 200, JSON.stringify(await profile.json()));
+    const reloaded = await (await request('/companies/me')).json();
+    assert.equal(reloaded.company.description, 'Company description\nWith two lines.');
+    assert.deepEqual(reloaded.company.qualifications, ['Government project delivery']);
+    assert.deepEqual(reloaded.company.certifications, ['ISO 27001', 'ISO 9001']);
     const matches = await request('/matches'); const result = await matches.json();
     assert.equal(matches.status, 200, JSON.stringify(result));
     assert.equal(result.items.length, 1);

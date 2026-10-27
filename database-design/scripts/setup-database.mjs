@@ -213,6 +213,8 @@ const collectionDefinitions = {
     required: ['legalName', 'displayName', 'companySize', 'technologies', 'qualifications', 'verificationStatus', 'createdAt', 'updatedAt'],
     properties: {
       legalName: { bsonType: 'string', minLength: 2 },
+      description: { bsonType: 'string', maxLength: 2000 },
+      certifications: { bsonType: 'array', maxItems: 100, items: { bsonType: 'string', maxLength: 200 } },
       displayName: { bsonType: 'string', minLength: 2 },
       taxId: { bsonType: ['string', 'null'] },
       companySize: { bsonType: 'string' },

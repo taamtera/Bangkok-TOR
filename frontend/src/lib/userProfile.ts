@@ -19,6 +19,8 @@ export function safeUserToProfile(
     name,
     email: user.email,
     companyName: overrides.companyName || name,
+    description: '',
+    qualifications: [],
     taxId: overrides.taxId || '',
     avatar: user.profile.avatarUrl || DEFAULT_AVATAR,
     companySize: '',
@@ -40,6 +42,9 @@ export function companyDataToProfile(
   return {
     ...profile,
     companyName: company.displayName || profile.companyName,
+    description: company.description ?? '',
+    qualifications: company.qualifications ?? [],
+    certifications: company.certifications ?? [],
     companySize: company.companySize === 'Not specified' ? '' : company.companySize,
     district: company.district || '',
     email: company.contactEmail || profile.email,
@@ -54,12 +59,14 @@ export function companyDataToProfile(
 export function profileToCompanyData(profile: SoftwareHouseProfile): CompanyProfileData {
   return {
     displayName: profile.companyName,
+    description: profile.description ?? '',
     companySize: profile.companySize,
     district: profile.district,
     contactEmail: profile.email,
-    // Catalog tags are the only source of capabilities; no free-text is sent.
+    // Keep profile details separate from selected catalog service links.
     technologies: [],
-    qualifications: [],
+    qualifications: (profile.qualifications ?? []).map(value => value.trim()).filter(Boolean),
+    certifications: (profile.certifications ?? []).map(value => value.trim()).filter(Boolean),
     tags: (profile.tags ?? []).map(({ tagId }) => ({ tagId }))
   };
 }

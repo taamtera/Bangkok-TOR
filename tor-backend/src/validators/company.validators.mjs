@@ -55,7 +55,7 @@ export function validateCompanyProfile(body = {}) {
     invalid('A company profile object is required.');
   }
 
-  const allowed = new Set(['displayName', 'companySize', 'district', 'contactEmail', 'technologies', 'qualifications', 'tags']);
+  const allowed = new Set(['displayName', 'description', 'certifications', 'companySize', 'district', 'contactEmail', 'technologies', 'qualifications', 'tags']);
   const unsupported = Object.keys(body).find((field) => !allowed.has(field));
   if (unsupported) invalid(`Unsupported company profile field: ${unsupported}.`);
 
@@ -64,9 +64,18 @@ export function validateCompanyProfile(body = {}) {
   const district = optionalText(body.district, 'Office location', 120);
   const contactEmail = optionalText(body.contactEmail, 'Primary contact email', 254);
   if (contactEmail && !EMAIL_PATTERN.test(contactEmail)) invalid('Primary contact email is invalid.');
+  let description;
+  if (Object.hasOwn(body, 'description')) {
+    if (body.description != null && (typeof body.description !== 'string' || body.description.length > 2000)) {
+      invalid('Company description must be text of at most 2000 characters.');
+    }
+    description = body.description?.trim() || '';
+  }
 
   return {
     displayName,
+    ...(description !== undefined ? { description } : {}),
+    ...(Object.hasOwn(body, 'certifications') ? { certifications: textList(body.certifications, 'Certifications', 100, 200) } : {}),
     companySize,
     district: district || null,
     contactEmail: contactEmail || null,

@@ -186,6 +186,45 @@ export const SoftwareHouseProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           </div>
 
+          <div>
+            <label htmlFor="company-description" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t('Company description')}</label>
+            <textarea
+              id="company-description"
+              value={profile.description ?? ''}
+              onChange={event => setProfile({ ...profile, description: event.target.value })}
+              maxLength={2000}
+              rows={4}
+              className="w-full px-4 py-2.5 theme-input rounded-xl text-sm resize-y"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="company-qualifications" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t('Qualifications')}</label>
+              <textarea
+                id="company-qualifications"
+                value={(profile.qualifications ?? []).join('\n')}
+                onChange={event => setProfile({ ...profile, qualifications: event.target.value.split('\n') })}
+                rows={4}
+                aria-describedby="company-qualifications-help"
+                className="w-full px-4 py-2.5 theme-input rounded-xl text-sm resize-y"
+              />
+              <p id="company-qualifications-help" className="mt-1 text-xs text-slate-500">{t('Enter one item per line.')}</p>
+            </div>
+            <div>
+              <label htmlFor="company-certifications" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t('Certifications')}</label>
+              <textarea
+                id="company-certifications"
+                value={(profile.certifications ?? []).join('\n')}
+                onChange={event => setProfile({ ...profile, certifications: event.target.value.split('\n') })}
+                rows={4}
+                aria-describedby="company-certifications-help"
+                className="w-full px-4 py-2.5 theme-input rounded-xl text-sm resize-y"
+              />
+              <p id="company-certifications-help" className="mt-1 text-xs text-slate-500">{t('Enter one item per line.')}</p>
+            </div>
+          </div>
+
           <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-3">
             <ContractorServices tags={profile.tags ?? []} onRemove={tagId => setProfile(previous => ({ ...previous, tags: (previous.tags ?? []).filter(tag => tag.tagId !== tagId) }))} />
             <div className="space-y-2">
