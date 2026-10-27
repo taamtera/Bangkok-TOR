@@ -44,7 +44,8 @@ export async function findActiveTagsByIds(ids) {
 }
 
 export async function listActiveTagsForMatching() {
-  return tags().find({ status: 'active' }).toArray();
+  const catalog = await tags().find({ status: 'active' }).toArray();
+  return catalog.map((tag) => ({ ...tag, name: tag.text || tag.name }));
 }
 
 export async function findLatestTorVersions(torIds) {

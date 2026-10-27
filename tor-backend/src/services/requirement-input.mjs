@@ -1,14 +1,13 @@
 import { env } from '../config/env.mjs';
 import { conceptForTag } from './tag-catalog.mjs';
 
-function reviewedRequirements(tor, tagsById) {
-  return (tor.tagAssignments || []).filter((assignment) => assignment.reviewStatus === 'approved'
-    && ['required', 'preferred', 'informational'].includes(assignment.requirementLevel)
+function storedTagRequirements(tor, tagsById) {
+  return (tor.tagAssignments || []).filter((assignment) => ['required', 'preferred', 'mentioned', 'informational'].includes(assignment.requirementLevel)
     && typeof assignment.evidence === 'string' && assignment.evidence.trim()
     && tagsById.has(assignment.tagId?.toString())).map((assignment, index) => ({
       key: `tag-${assignment.tagId}-${index}`, tagId: assignment.tagId.toString(),
       text: tagsById.get(assignment.tagId.toString()).name,
-      importance: assignment.requirementLevel, sourceType: 'reviewed_requirement',
+      importance: assignment.requirementLevel, sourceType: 'stored_tag_requirement',
       evidence: assignment.evidence,
       sourceUrl: assignment.sourceDocumentUrl || tor.documentUrl || tor.url || null,
       sourcePage: assignment.sourcePage == null ? null : String(assignment.sourcePage)
@@ -16,7 +15,7 @@ function reviewedRequirements(tor, tagsById) {
 }
 
 export function prepareMatchingTors(tors, tags, versions, evaluations) {
-  const tagsById = new Map(tags.map((tag) => [tag._id.toString(), tag]));
+  const tagsById = new Map(tags.map((tag) => [tag._id.toString(), { ...tag, name: tag.text || tag.name }]));
   return tors.map((tor) => {
     const version = versions.get(tor._id.toString()) ?? tor.version ?? tor.torVersion ?? 1;
     // The existing seed is the only accepted demo input. A completed AI record
@@ -46,7 +45,7 @@ export function prepareMatchingTors(tors, tags, versions, evaluations) {
       sourceType: 'demo', evidence: 'Demo requirement; not extracted from an official tender.',
       sourceUrl: null, sourcePage: null
     })).filter((item) => typeof item.text === 'string' && item.text.trim())
-      : reviewedRequirements(tor, tagsById);
+      : storedTagRequirements(tor, tagsById);
     return { ...tor, matchingVersion: version, matchingRequirements: requirements };
   });
 }

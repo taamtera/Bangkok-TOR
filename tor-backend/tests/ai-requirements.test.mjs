@@ -7,6 +7,33 @@ import { planCatalogCleanup } from '../src/tag-catalog-migration.mjs';
 import { allowedRequirementUrl, fetchRequirementPdf, extractPdfPages } from '../src/services/requirement-source.mjs';
 import { authenticateAiWorker } from '../src/middleware/authenticate-ai-worker.mjs';
 import { prepareMatchingTors } from '../src/services/requirement-input.mjs';
+import { runPythonMatching } from '../src/services/python-matching.mjs';
+
+test('stored TOR tags are matching requirements regardless of review stage', async () => {
+  const tagId = new ObjectId();
+  const tags = [{ _id: tagId, text: 'Internet Service', status: 'active' }];
+  const tors = ['suggested', 'approved', 'rejected', 'validated', undefined].map((reviewStatus) => ({
+    _id: new ObjectId(), projectId: String(reviewStatus), tagAssignments: [{
+      tagId, requirementLevel: 'required', evidence: 'Internet Service', reviewStatus
+    }]
+  }));
+  const prepared = prepareMatchingTors(tors, tags, new Map(), []);
+  for (const tor of prepared) {
+    assert.equal(tor.matchingRequirements.length, 1);
+    assert.equal(tor.matchingRequirements[0].text, 'Internet Service');
+    assert.equal(tor.matchingRequirements[0].tagId, String(tagId));
+  }
+  const result = await runPythonMatching({
+    companies: [{ _id: 'test-company', technologies: ['Internet Service'] }],
+    activeTags: tags.map(tag => ({ ...tag, name: tag.text })),
+    tors: prepared
+  });
+  assert.equal(result.items.length, tors.length);
+  for (const item of result.items) {
+    assert.equal(item.status, 'compared');
+    assert.equal(item.requirementMatches[0].status, 'met');
+  }
+});
 
 const source = { _id: new ObjectId(), torVersion: 1, pages: [{ page: 1, text: 'The contractor must deliver microservices using Docker or Kubernetes.' }] };
 const input = () => ({ sourceId: String(source._id), torVersion: 1, model: { provider: 'test', name: 'fixture', version: '1', promptVersion: '1' }, requirements: [{

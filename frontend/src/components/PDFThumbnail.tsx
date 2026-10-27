@@ -50,12 +50,6 @@ export const PDFThumbnail: React.FC<PDFThumbnailProps> = ({ contract, className 
   // Otherwise, render a realistic official Government PDF Document 1st-Page Sheet Preview
   return (
     <div className={`relative overflow-hidden rounded-md bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 p-2.5 flex flex-col justify-between select-none group/thumb shadow-sm ${className}`}>
-      <div className="flex items-center justify-end gap-1 mb-1.5">
-        <span className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[90px]">
-          {(contract.departmentName || contract.contractOwner || 'e-GP').split(' ')[0]}
-        </span>
-      </div>
-
       {/* Simulated Document Sheet / First Page Layout */}
       <div className="bg-white dark:bg-slate-900/90 rounded border border-slate-200/80 dark:border-slate-800 p-2 flex-1 flex flex-col justify-between shadow-xs">
         <div>

@@ -9,10 +9,9 @@ export function serializeTor(tor) {
   const result = {
     ...project, projectId,
     documents: normalizeTorDocuments(tor.documents ?? []),
-    // Expose reviewed annotations and exact, source-cited announcement mentions
-    // used by automatic recommendation candidates. Pending AI suggestions stay private.
+    // Stored TOR tags are usable regardless of their review stage.
     tagAssignments: Array.isArray(tor.tagAssignments)
-      ? tor.tagAssignments.filter((assignment) => assignment?.reviewStatus === 'approved' || assignment?.reviewStatus === 'auto_detected')
+      ? tor.tagAssignments.filter((assignment) => assignment?.tagId)
       : [],
     scope: tor.scope ?? 'department',
     identityScope: tor.identityScope ?? (projectId?.startsWith('P') ? 'plan' : 'project'),

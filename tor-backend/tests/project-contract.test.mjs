@@ -15,13 +15,13 @@ function responseRecorder() {
 
 const removedFields = ['opend', 'opendLookup', 'province', 'district', 'subdistrict', 'projectLocation', 'projectMoney', 'referencePrice', 'totalContractValue', 'contractProjectStatus', 'contracts', 'opendUpdatedAt', 'locationFilter'];
 
-test('public TOR serialization excludes pending and rejected AI requirement suggestions', () => {
+test('public TOR serialization includes stored tags regardless of review stage', () => {
   const result = serializeTor({ projectId: '123', tagAssignments: [
     { tagId: 'approved', reviewStatus: 'approved', source: 'manual' },
     { tagId: 'pending', reviewStatus: 'suggested', source: 'ai' },
     { tagId: 'rejected', reviewStatus: 'rejected', source: 'ai' }
   ] });
-  assert.deepEqual(result.tagAssignments.map(({ tagId }) => tagId), ['approved']);
+  assert.deepEqual(result.tagAssignments.map(({ tagId }) => tagId), ['approved', 'pending', 'rejected']);
 });
 
 test('serialization keeps project identity and RSS stages while omitting all removed fields', () => {

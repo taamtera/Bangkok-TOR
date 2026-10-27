@@ -25,6 +25,8 @@ This document is the agreed boundary between the database/backend foundation and
 }
 ```
 
+Company legal names and non-empty display names must contain at least 2 characters after trimming, matching the database validator. Omitted company size is stored as `Not specified`. Invalid names return HTTP 400 with `VALIDATION_ERROR` before any account or company is created.
+
 When `company.mode` is `create`, the first user becomes `company_admin` and the company starts as `unverified`. Joining an existing company must use a valid company invitation token instead of accepting an arbitrary `companyId` from the browser.
 
 The backend must normalize email addresses, hash the password, create the user with `pending_verification`, create an email-verification token, and record a registration audit event.

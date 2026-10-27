@@ -19,7 +19,7 @@ function requireString(value, label, { min = 1, max = 200 } = {}) {
   const trimmed = value.trim();
 
   if (trimmed.length < min) {
-    throw invalid(`${label} is required.`);
+    throw invalid(min > 1 ? `${label} must be at least ${min} characters.` : `${label} is required.`);
   }
 
   if (trimmed.length > max) {
@@ -51,12 +51,12 @@ function requirePassword(value) {
   return value;
 }
 
-function optionalString(value, label, { max = 200 } = {}) {
+function optionalString(value, label, { min = 1, max = 200 } = {}) {
   if (value === undefined || value === null || value === '') {
     return null;
   }
 
-  return requireString(value, label, { max });
+  return requireString(value, label, { min, max });
 }
 
 export function validateRegister(body = {}) {
@@ -87,7 +87,7 @@ export function validateRegister(body = {}) {
     };
   }
 
-  const legalName = requireString(company.legalName, 'Company legal name', { max: 200 });
+  const legalName = requireString(company.legalName, 'Company legal name', { min: 2, max: 200 });
 
   return {
     firstName,
@@ -99,7 +99,7 @@ export function validateRegister(body = {}) {
     company: {
       mode,
       legalName,
-      displayName: optionalString(company.displayName, 'Company display name', { max: 200 }),
+      displayName: optionalString(company.displayName, 'Company display name', { min: 2, max: 200 }),
       taxId: optionalString(company.taxId, 'Tax ID', { max: 32 }),
       companySize: optionalString(company.companySize, 'Company size', { max: 80 }),
       district: optionalString(company.district, 'District', { max: 120 })

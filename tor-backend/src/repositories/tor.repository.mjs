@@ -8,8 +8,22 @@ function tors() {
   return getDatabase().collection('tor_announcements');
 }
 
+async function withTorTagLabels(items) {
+  const ids = [...new Set(items.flatMap(tor => (tor.tagAssignments || [])
+    .map(assignment => String(assignment?.tagId || ''))))].filter(id => ObjectId.isValid(id));
+  if (!ids.length) return items;
+  const catalog = await getDatabase().collection('tags').find({
+    _id: { $in: ids.map(id => new ObjectId(id)) }
+  }, { projection: { text: 1, name: 1 } }).toArray();
+  const labels = new Map(catalog.map(tag => [String(tag._id), tag.text || tag.name]));
+  return items.map(tor => ({ ...tor, tagAssignments: (tor.tagAssignments || []).map(assignment => ({
+    ...assignment, tagText: labels.get(String(assignment.tagId)) || null
+  })) }));
+}
+
 export async function findTorByProjectId(projectId) {
-  return tors().findOne({ projectId });
+  const tor = await tors().findOne({ projectId });
+  return tor ? (await withTorTagLabels([tor]))[0] : null;
 }
 
 export async function updateTor(torId, changes, updatedByUserId) {
@@ -64,8 +78,7 @@ export async function listTors({
     filter.tagAssignments = {
       $all: tagIds.map((tagId) => ({
         $elemMatch: {
-          tagId: toObjectId(tagId, 'tagId'),
-          reviewStatus: 'approved'
+          tagId: toObjectId(tagId, 'tagId')
         }
       }))
     };
@@ -115,7 +128,7 @@ export async function listTors({
   ]);
 
   return {
-    items,
+    items: await withTorTagLabels(items),
     facets: { departments: metadata.departments, methods: metadata.methods },
     totalAllProjects: metadata.total[0]?.count ?? 0,
     pagination: {

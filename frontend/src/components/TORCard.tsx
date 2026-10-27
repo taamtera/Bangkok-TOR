@@ -15,6 +15,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { PDFThumbnail } from './PDFThumbnail';
+import { TORTags } from './TORTags';
 import { getStatusClasses, getStatusLabel, getProjectStatus } from '@/lib/torPresentation';
 
 interface TORCardProps {
@@ -70,13 +71,14 @@ export const TORCard: React.FC<TORCardProps> = ({ contract, onSelect }) => {
               <span>{t("Published:")} {contract.statusPublishedAt || contract.publishedAt || contract.postingDate}</span>
             </div>
           </div>
+          <TORTags contract={contract} />
         </div>
 
         {/* Price Tag */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
           <div>
-            <span className="text-[10px] font-medium text-slate-400 block uppercase">{t("Procurement Method")}</span>
-            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{procurementMethodLabel(typeof contract.procurementMethod === 'string' ? contract.procurementMethod : contract.category, language)}</span>
+            <span className="text-[10px] font-medium text-slate-400 block uppercase">{t("Project budget:")}</span>
+            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{t(contract.priceFormatted)}</span>
           </div>
           
           <div className="flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 group-hover:translate-x-1 transition-all">

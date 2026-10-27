@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { TORContract } from '@/types';
 import { DocumentPreview } from './PDFReader';
 import { ProjectObservations } from './ProjectObservations';
+import { TORTags } from './TORTags';
 import { getStatusClasses, getStatusLabel, getProjectStatus } from '@/lib/torPresentation';
 import { 
   X, 
@@ -153,12 +154,14 @@ export const TORDetailModal: React.FC<TORDetailModalProps> = ({
                   </span>
                 </div>
 
-                {/* Date range: 22 may 2026 - 22 dec 2026 */}
+                <TORTags contract={contract} />
+
+                {/* Contract period and project budget */}
                 <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 dark:text-slate-300 mb-4 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <div className="flex items-center gap-1.5">
+                  {(contract.startDate || contract.endDate) && <div className="flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-slate-400" />
                     <span>{t("Contract period:")} <strong className="text-slate-900 dark:text-white">{contract.startDate} - {contract.endDate}</strong></span>
-                  </div>
+                  </div>}
                   {/* price: 3,000,000 THB */}
                   <div className="ml-auto">
                     <span className="text-slate-500 dark:text-slate-400 mr-1.5">{t("Project budget:")}</span>

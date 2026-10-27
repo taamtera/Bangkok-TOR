@@ -79,6 +79,7 @@ export interface TORContract extends Partial<ProjectFields> {
   procurementMethod?: string | Record<string, unknown> | null;
   description: string;
   properties: TORRequirement[];
+  tags?: Array<{ id: string; text: string }>;
   pdfUrl: string;
   url?: string | null;
   documentUrl?: string | null;

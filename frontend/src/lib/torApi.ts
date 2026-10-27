@@ -24,6 +24,7 @@ export interface BackendTor extends Partial<ProjectFields> {
   } | null;
   tagAssignments?: Array<{
     tagId?: string;
+    tagText?: string | null;
     requirementLevel?: 'required' | 'preferred' | 'mentioned' | 'informational';
     evidence?: string | null;
     reviewStatus?: string | null;
@@ -101,6 +102,10 @@ export function toTorContract(tor: BackendTor): TORContract {
     procurementMethod: tor.procurementMethod || null,
     description: tor.description || '',
     properties: mapRequirements(tor),
+    tags: [...new Map((tor.tagAssignments || []).filter(assignment => assignment.tagId)
+      .map(assignment => [assignment.tagId!, {
+        id: assignment.tagId!, text: assignment.tagText || assignment.evidence || 'Tagged requirement'
+      }])).values()],
     pdfUrl: documentUrl || '',
     url: tor.url || null,
     documentUrl: tor.documentUrl || null,
