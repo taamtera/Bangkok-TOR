@@ -63,7 +63,7 @@ test('current APIs work with canonical tags, live validators, sessions and polic
     // Authorization must use the current DB role, even with the original access cookie.
     await db.collection('users').updateOne({ _id: user._id }, { $set: { role: 'system_admin' } });
     const canonicalId = new ObjectId();
-    await db.collection('tags').insertOne({ _id: canonicalId, text: 'Docker', category: 'technology', type: 'specification' });
+    await db.collection('tags').insertOne({ _id: canonicalId, text: 'Docker', category: 'technology', type: 'specification', status: 'active' });
     const catalog = await (await request('/tags?search=Docker')).json();
     assert.equal(catalog.items[0].name, 'Docker');
     const duplicate = await request('/tags', 'POST', { text: ' DOCKER ', category: 'technology', type: 'specification' });
@@ -85,7 +85,8 @@ test('current APIs work with canonical tags, live validators, sessions and polic
       url: sourceUrl, documentUrl: sourceUrl, procurementMethod: 'e-bidding', channelParams: {}, itemParams: {},
       firstSeenAt: '2026-10-27', lastSeenAt: '2026-10-27', status: 'invitation_published', statusPublishedAt: '2026-10-27',
       statusOrderAmbiguous: false, stageObservations: {}, biddingOpenVerified: false, budget: { maxAmount: 884000 },
-      tagAssignments: [{ tagId: canonicalId, requirementLevel: 'required', evidence: quote, source: 'ai', reviewStatus: 'suggested' }],
+      tagAssignments: [{ tagId: canonicalId, requirementLevel: 'required', evidence: quote, source: 'ai', reviewStatus: 'suggested', confidence: 0.95 }],
+      aiProcessing: { status: 'completed', tagReviewStatus: 'approved' },
       documents: [{ sourceFormat: 'pdf', extractionStatus: 'success', extractedText: quote }],
       requirementSource: { snapshotId: sourceId, sourceUrl, documentHash, torVersion: 1 } });
     assert.equal((await (await request('/tors?maxBudget=900000')).json()).pagination.total, 1);

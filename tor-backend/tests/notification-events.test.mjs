@@ -22,11 +22,12 @@ test('positive coverage generates a schema-compatible in-app alert with an hones
   assert.equal(event.deliveryError, null);
 });
 
-test('repeated recalculations and TOR versions share the same idempotency key', () => {
+test('repeated recalculations deduplicate and distinct TOR versions have distinct keys', () => {
   const first = newMatchEvents([match, match], [project], [user]);
   const next = newMatchEvents([{ ...match, torVersion: 2, score: 80 }], [project], [user]);
   assert.equal(first.length, 1);
-  assert.equal(first[0].eventKey, next[0].eventKey);
+  assert.notEqual(first[0].eventKey, next[0].eventKey);
+  assert.equal(first[0].eventKey, newMatchEvents([match], [project], [user])[0].eventKey);
 });
 
 test('zero, missing, invalid, unavailable and AI recommendation results do not trigger match alerts', () => {
@@ -59,4 +60,10 @@ test('public notification serialization omits internal IDs, event keys, recipien
   assert.equal(result.isRead,false);
   for (const key of ['userId','companyId','torId','eventKey','deliveryError']) assert.equal(result[key],undefined);
   assert.equal(serializeNotification({...event,_id:new ObjectId(),status:'read'}).projectId,null);
+});
+
+test('closed, cancelled and awarded projects do not generate new alerts', () => {
+  for (const status of ['award_published', 'award_cancelled', 'award_amended', 'invitation_cancelled']) {
+    assert.deepEqual(newMatchEvents([match], [{ ...project, status }], [user]), []);
+  }
 });

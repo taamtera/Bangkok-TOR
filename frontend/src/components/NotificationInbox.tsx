@@ -21,6 +21,7 @@ export function NotificationInbox({ onClose, onChanged, onViewProject }: Props) 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<api.NotificationPreferences | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const mounted = useRef(true);
 
@@ -45,6 +46,14 @@ export function NotificationInbox({ onClose, onChanged, onViewProject }: Props) 
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [page, refresh]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    api.getNotificationPreferences(controller.signal).then(value => {
+      if (!controller.signal.aborted) setPreferences(value);
+    }).catch(() => { if (!controller.signal.aborted) setError('Could not load email alert settings.'); });
+    return () => controller.abort();
+  }, []);
 
   async function action(work: () => Promise<void>) {
     setBusy(true);
@@ -71,7 +80,7 @@ export function NotificationInbox({ onClose, onChanged, onViewProject }: Props) 
       onKeyDown={event => {
         if (event.key === 'Escape') { event.preventDefault(); onClose(); }
         if (event.key === 'Tab') {
-          const controls = panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], [tabindex="0"]');
+          const controls = panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href], [tabindex="0"]');
           if (!controls?.length) return;
           const first = controls[0], last = controls[controls.length - 1];
           if (event.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) { event.preventDefault(); last.focus(); }
@@ -88,6 +97,18 @@ export function NotificationInbox({ onClose, onChanged, onViewProject }: Props) 
           <button disabled={busy || loading} onClick={() => setRefresh(value => value + 1)} aria-label={t('Refresh notifications')} className="flex items-center gap-1 disabled:opacity-40"><RefreshCw className="h-4 w-4" />{t('Refresh')}</button>
           <button disabled={busy || loading || !data?.unreadCount} onClick={() => void action(async () => { await api.markAllNotificationsRead(); })} className="font-semibold text-sky-600 disabled:opacity-40">{t('Mark all as read')}</button>
         </div>
+      </div>
+      <div className="border-b border-slate-200 px-5 py-3 text-sm dark:border-slate-700">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={preferences?.emailAlerts ?? false}
+            disabled={busy || !preferences || (!preferences.emailAvailable && !preferences.emailAlerts)}
+            onChange={event => {
+              const enabled = event.target.checked;
+              void action(async () => { setPreferences(await api.updateNotificationPreferences(enabled)); });
+            }} />
+          {t('Email me when new TORs match my company')}
+        </label>
+        {preferences && !preferences.emailAvailable && <p className="mt-1 text-xs text-slate-500">{t('Email alerts are not available yet.')}</p>}
       </div>
       <div className="overflow-y-auto p-5" aria-busy={loading}>
         {error && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{t(error)}</p>}

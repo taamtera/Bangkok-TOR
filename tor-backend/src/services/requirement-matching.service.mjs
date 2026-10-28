@@ -18,9 +18,10 @@ async function context(tors = null) {
   return { activeTags: tags, tors: prepareMatchingTors(await withTorTagLabels(projects), tags, versions, evaluations) };
 }
 
-function companyInput(company) {
+export function companyInput(company) {
   return { _id: company._id, technologies: company.technologies || [],
-    qualifications: company.qualifications || [], tagAssignments: company.tagAssignments || [] };
+    qualifications: company.qualifications || [], certifications: company.certifications || [],
+    tagAssignments: company.tagAssignments || [] };
 }
 
 function workerInput(companies, source) {
@@ -30,7 +31,7 @@ function workerInput(companies, source) {
       ({ _id, matchingVersion, matchingRequirements })) };
 }
 
-async function calculate(companies, source) {
+async function calculate(companies, source, { strictNotifications = false } = {}) {
   if (!companies.length || !source.tors.length) return [];
   const result = await runPythonMatching(workerInput(companies, source));
   const computedAt = new Date();
@@ -41,7 +42,8 @@ async function calculate(companies, source) {
   await saveCompanyMatches(records);
   try {
     await publishMatchNotifications(records, source.tors);
-  } catch {
+  } catch (error) {
+    if (strictNotifications) throw error;
     // A notification outage must not discard successfully calculated matches.
     console.error('Could not publish new-match notifications; a later matching refresh will retry.');
   }
@@ -99,10 +101,10 @@ export async function refreshCompanyRequirementMatches(companyId) {
   await getCompanyMatches(companyId, { page: 1, limit: 1 });
 }
 
-export async function refreshTorRequirementMatches(tor) {
+export async function refreshTorRequirementMatches(tor, options = {}) {
   if (!tor?._id) return;
   const [companies, source] = await Promise.all([listCompaniesForMatching(), context([tor])]);
   for (let offset = 0; offset < companies.length; offset += 100) {
-    await calculate(companies.slice(offset, offset + 100), source);
+    await calculate(companies.slice(offset, offset + 100), source, options);
   }
 }

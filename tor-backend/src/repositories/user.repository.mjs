@@ -46,7 +46,8 @@ export async function createRegisteredUser({
     role,
     companyId: companyId ? toObjectId(companyId, 'companyId') : null,
     notificationPreferences: {
-      channels: ['in_app', 'email'],
+      channels: ['in_app'],
+      matchEmailOptIn: false,
       alertTypes: ['new_match', 'tor_updated', 'deadline_reminder'],
       deadlineReminderDays: 7
     },

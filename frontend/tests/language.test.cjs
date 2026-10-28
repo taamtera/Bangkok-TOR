@@ -176,3 +176,11 @@ test('document popup uses a format-neutral frame and offers source and download 
   assert.doesNotMatch(missing, /<iframe/);
   assert.match(missing, /No source document is available/);
 });
+
+test('profile saves retain stored technologies while service links remain optional', () => {
+  const profile = companyDataToProfile({ companyName: 'Example', technologies: [] }, {
+    displayName: 'Example', companySize: '', district: '', technologies: ['Docker'], qualifications: []
+  });
+  assert.deepEqual(profileToCompanyData(profile).technologies, ['Docker']);
+  assert.equal(Object.hasOwn(profileToCompanyData(profile), 'tags'), false);
+});

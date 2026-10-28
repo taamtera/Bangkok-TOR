@@ -52,7 +52,9 @@ test('catalog label persists through create, PATCH, search, legacy reads, and pr
     await updateCompanyProfile(companyId, validateCompanyProfile({ ...base, tags: [{ tagId: created._id.toString() }] }));
     const storedCompany = await db.collection('companies').findOne({ _id: company._id });
     assert.deepEqual(storedCompany.tags, [{ tagId: created._id }]);
-    assert.equal(Object.hasOwn(storedCompany, 'tagAssignments'), false);
+    assert.equal(storedCompany.tagAssignments.length, 1);
+    assert.equal(String(storedCompany.tagAssignments[0].tagId), String(created._id));
+    assert.equal(storedCompany.tagAssignments[0].verificationLevel, 'claimed');
     assert.equal((await findCompanyProfileById(companyId)).tags[0].contractorLabel, 'Internet Service Provider');
     await updateControlledTag(created._id.toString(), { contractorLabel: 'Updated Internet Service Provider' });
     assert.equal((await findCompanyProfileById(companyId)).tags[0].contractorLabel, 'Updated Internet Service Provider');

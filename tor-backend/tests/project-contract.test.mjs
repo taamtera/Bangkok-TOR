@@ -15,13 +15,15 @@ function responseRecorder() {
 
 const removedFields = ['opend', 'opendLookup', 'province', 'district', 'subdistrict', 'projectLocation', 'projectMoney', 'referencePrice', 'totalContractValue', 'contractProjectStatus', 'contracts', 'opendUpdatedAt', 'locationFilter'];
 
-test('public TOR serialization includes stored tags regardless of review stage', () => {
-  const result = serializeTor({ projectId: '123', tagAssignments: [
-    { tagId: 'approved', reviewStatus: 'approved', source: 'manual' },
-    { tagId: 'pending', reviewStatus: 'suggested', source: 'ai' },
-    { tagId: 'rejected', reviewStatus: 'rejected', source: 'ai' }
-  ] });
-  assert.deepEqual(result.tagAssignments.map(({ tagId }) => tagId), ['approved', 'pending', 'rejected']);
+test('public TOR serialization excludes rejected and unreviewed tags', () => {
+  const common = { requirementLevel: 'required', evidence: 'Source requirement', confidence: 0.9 };
+  const tor = { projectId: '123', aiProcessing: { status: 'completed', tagReviewStatus: 'approved' }, tagAssignments: [
+    { ...common, tagId: 'approved', reviewStatus: 'approved', source: 'manual' },
+    { ...common, tagId: 'suggested', reviewStatus: 'suggested', source: 'ai' },
+    { ...common, tagId: 'rejected', reviewStatus: 'rejected', source: 'ai' }
+  ] };
+  assert.deepEqual(serializeTor(tor).tagAssignments.map(a => a.tagId), ['approved', 'suggested']);
+  assert.deepEqual(serializeTor({ ...tor, aiProcessing: {} }).tagAssignments.map(a => a.tagId), ['approved']);
 });
 
 test('serialization keeps project identity and RSS stages while omitting all removed fields', () => {

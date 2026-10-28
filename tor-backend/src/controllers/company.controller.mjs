@@ -27,7 +27,6 @@ export async function updateMyProfile(request, response) {
   const profile = validateCompanyProfile(request.body);
   const company = await updateCompanyProfile(companyId, profile);
   if (!company) throw httpError(404, 'COMPANY_NOT_FOUND', 'The linked company profile does not exist.');
-  await syncCompanyProfileTagAssignments(companyId);
   await refreshAfterSave(companyId);
   response.json({ company: toCompanyProfile(await findCompanyProfileById(companyId)) });
 }

@@ -26,7 +26,8 @@ export function MatchingResultsView({ currentUser, onSelectContract, onEditProfi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // Profile changes and returning to this tab recalculate from saved values.
-  const profileKey = JSON.stringify([currentUser.id, currentUser.technologies, currentUser.properties]);
+  const profileKey = JSON.stringify([currentUser.id, currentUser.technologies, currentUser.properties,
+    currentUser.qualifications, currentUser.certifications, currentUser.tags]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(''); setResult(null);

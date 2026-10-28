@@ -1,3 +1,4 @@
+import { usableTorTagAssignment } from './tor-tag-eligibility.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { getDatabase } from '../config/database.mjs';
 import { findCompanyProfileById } from '../repositories/company.repository.mjs';
@@ -39,7 +40,7 @@ export function buildEvaluationInput(company, tor) {
       status: tor.status ?? null, publishedAt: tor.publishedAt ?? null, statusPublishedAt: tor.statusPublishedAt ?? null,
       budget: tor.budget ?? null, projectStartAt: tor.projectStartAt ?? null, projectEndAt: tor.projectEndAt ?? null,
       submissionDeadline: tor.submissionDeadline ?? null, documentUrl: tor.documentUrl || tor.url || null,
-      tags: (tor.tagAssignments || []).map(tag => ({ tagId: String(tag.tagId), text: tag.tagText ?? null,
+      tags: (tor.tagAssignments || []).filter(tag => usableTorTagAssignment(tor, tag)).map(tag => ({ tagId: String(tag.tagId), text: tag.tagText ?? null,
         requirementLevel: tag.requirementLevel ?? null, evidence: clean(tag.evidence, 500) })),
       extractedRequirements: (tor.aiExtractedRequirements || []).slice(0, 40).map(item => ({
         text: clean(item.text, 500), category: item.category ?? null, requirementLevel: item.requirementLevel ?? null,

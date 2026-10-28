@@ -1,11 +1,11 @@
 import { env } from '../config/env.mjs';
+import { usableTorTagAssignment } from './tor-tag-eligibility.mjs';
 import { conceptForTag } from './tag-catalog.mjs';
 
 function storedTagRequirements(tor, tagsById) {
   const weights = { required: 3, preferred: 1, mentioned: 1, informational: 0 };
   const unique = new Map();
-  for (const assignment of (tor.tagAssignments || []).filter((assignment) => ['required', 'preferred', 'mentioned', 'informational'].includes(assignment.requirementLevel)
-    && typeof assignment.evidence === 'string' && assignment.evidence.trim()
+  for (const assignment of (tor.tagAssignments || []).filter(assignment => usableTorTagAssignment(tor, assignment)
     && tagsById.has(assignment.tagId?.toString()))) {
     const id = String(assignment.tagId), previous = unique.get(id);
     if (!previous || weights[assignment.requirementLevel] > weights[previous.requirementLevel]) unique.set(id, assignment);
@@ -21,7 +21,7 @@ function storedTagRequirements(tor, tagsById) {
 }
 
 export function prepareMatchingTors(tors, tags, versions, evaluations) {
-  const tagsById = new Map(tags.map((tag) => [tag._id.toString(), { ...tag, name: tag.text || tag.name }]));
+  const tagsById = new Map(tags.filter(tag => tag.status !== 'inactive' && !tag.matchingExcluded).map((tag) => [tag._id.toString(), { ...tag, name: tag.text || tag.name }]));
   return tors.map((tor) => {
     const version = versions.get(tor._id.toString()) ?? tor.version ?? tor.torVersion ?? 1;
     // The existing seed is the only accepted demo input. A completed AI record

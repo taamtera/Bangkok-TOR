@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { toCompanyProfile } from '../src/serializers/company.serializer.mjs';
 import { validateCompanyProfile } from '../src/validators/company.validators.mjs';
-import { companyProfileTagEntries, mergeQualifications } from '../src/utils/company-profile.mjs';
+import { companyProfileTagEntries, mergeQualifications, mergeProfileAssignments } from '../src/utils/company-profile.mjs';
 
 test('company profile validation trims fields, normalizes lists, and keeps empty size compatible with schema', () => {
   assert.deepEqual(validateCompanyProfile({
@@ -90,4 +90,13 @@ test('profile technologies and qualifications become exact, self-reported tag en
     { name: 'GIS', category: 'capability', evidence: 'Self-reported company profile qualification: GIS' },
     { name: 'ISO 27001', category: 'capability', evidence: 'Self-reported company profile qualification: ISO 27001' }
   ]);
+});
+
+test('profile synchronization preserves independent evidence and removes only its own claimed links', () => {
+  const verified = { tagId: 'service', source: 'manual', verificationLevel: 'verified', evidence: 'Reviewed certificate', reviewer: 'keep' };
+  const experienced = { tagId: 'experience', source: 'manual', verificationLevel: 'experienced', evidence: 'Selected from company profile.' };
+  const old = { tagId: 'old', source: 'manual', verificationLevel: 'claimed', evidence: 'Selected from company profile.' };
+  const derived = { tagId: 'new', source: 'manual', verificationLevel: 'claimed', evidence: 'Self-reported company service selection: New' };
+  assert.deepEqual(mergeProfileAssignments([verified, experienced, old], [{ ...derived, tagId: 'service' }, derived, derived]), [verified, experienced, derived]);
+  assert.deepEqual(mergeProfileAssignments([verified, experienced, old], []), [verified, experienced]);
 });

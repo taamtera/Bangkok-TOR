@@ -80,7 +80,7 @@ def company_capabilities(company, catalog, tag_concepts):
         if not current or EVIDENCE[entry["verificationLevel"]] > EVIDENCE[current["verificationLevel"]]:
             capabilities[key] = entry
 
-    for field in ("technologies", "qualifications"):
+    for field in ("technologies", "qualifications", "certifications"):
         for value in company.get(field, []):
             text = value if isinstance(value, str) else value.get("name", "")
             if not isinstance(text, str) or not text.strip():

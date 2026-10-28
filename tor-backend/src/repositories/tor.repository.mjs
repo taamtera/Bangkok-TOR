@@ -15,10 +15,12 @@ export async function withTorTagLabels(items) {
   if (!ids.length) return items;
   const catalog = await getDatabase().collection('tags').find({
     _id: { $in: ids.map(id => new ObjectId(id)) }
-  }, { projection: { text: 1, name: 1 } }).toArray();
-  const labels = new Map(catalog.map(tag => [String(tag._id), tag.text || tag.name]));
+  }, { projection: { text: 1, name: 1, status: 1, matchingExcluded: 1 } }).toArray();
+  const labels = new Map(catalog.map(tag => [String(tag._id), tag]));
   return items.map(tor => ({ ...tor, tagAssignments: (tor.tagAssignments || []).map(assignment => ({
-    ...assignment, tagText: labels.get(String(assignment.tagId)) || null
+    ...assignment, tagText: labels.get(String(assignment.tagId))?.text || labels.get(String(assignment.tagId))?.name || null,
+    tagStatus: labels.get(String(assignment.tagId))?.status || null,
+    tagMatchingExcluded: labels.get(String(assignment.tagId))?.matchingExcluded === true
   })) }));
 }
 

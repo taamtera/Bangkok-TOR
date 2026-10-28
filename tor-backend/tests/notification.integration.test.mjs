@@ -62,7 +62,7 @@ test('notification persistence, ownership, duplicate prevention and read control
   assert.equal(read.items[0].isRead,true);
   assert.equal((await request(owner,`/${id}/read`,'PATCH')).status,200);
   assert.equal((await (await request(owner)).json()).items[0].readAt,read.items[0].readAt);
-  await publishMatchNotifications([{...match,torVersion:2}],[project]);
+  await publishMatchNotifications([{...match,torVersion:1}],[project]);
   assert.equal((await (await request(owner)).json()).unreadCount,0);
   const stored = await db.collection('notifications').findOne({userId:owner._id});
   const {_id,...copy} = stored;

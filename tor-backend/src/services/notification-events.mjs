@@ -1,4 +1,5 @@
-// One initial positive requirement-match alert per person/company/project.
+export const alertableProject = project => !['award_published', 'award_cancelled', 'award_amended', 'invitation_cancelled'].includes(project?.status);
+// One positive match alert per person/company/project/version; retain legacy v1 keys.
 // Scores are coverage signals, not AI suitability or procurement eligibility.
 export function newMatchEvents(records, projects, users, now = new Date()) {
   const byId = new Map(projects.map(project => [String(project._id), project]));
@@ -7,12 +8,13 @@ export function newMatchEvents(records, projects, users, now = new Date()) {
     if (record.resultType !== 'requirement_match' || record.status !== 'compared'
         || !Number.isFinite(record.score) || record.score <= 0) continue;
     const project = byId.get(String(record.torId));
-    if (!project?.projectId) continue;
+    if (!project?.projectId || !alertableProject(project)) continue;
     for (const user of users) {
       if (user.status !== 'active' || user.deletedAt || String(user.companyId) !== String(record.companyId)
           || !user.notificationPreferences?.channels?.includes('in_app')
           || !user.notificationPreferences?.alertTypes?.includes('new_match')) continue;
-      const eventKey = `in_app:new_match:${user._id}:${record.companyId}:${record.torId}`;
+      const version = record.torVersion || 1;
+      const eventKey = `in_app:new_match:${user._id}:${record.companyId}:${record.torId}${version === 1 ? '' : `:v${version}`}`;
       events.set(eventKey, {
         eventKey, userId: user._id, companyId: record.companyId, torId: record.torId,
         type: 'new_match', channel: 'in_app', status: 'sent',

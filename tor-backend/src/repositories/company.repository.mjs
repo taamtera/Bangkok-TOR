@@ -1,6 +1,7 @@
+import { httpError } from '../utils/http-error.mjs';
 import { getDatabase } from '../config/database.mjs';
 import { toObjectId } from '../utils/object-id.mjs';
-import { companyProfileTagEntries, mergeQualifications } from '../utils/company-profile.mjs';
+import { companyProfileTagEntries, mergeQualifications, mergeProfileAssignments } from '../utils/company-profile.mjs';
 import { assertActiveTagIds, findOrCreateCatalogTag } from './tag.repository.mjs';
 
 function companies() {
@@ -69,79 +70,74 @@ export async function findCompanyProfileById(companyId) {
   return company ?? null;
 }
 
+async function profileAssignments(company) {
+  const derived = [];
+  const now = new Date();
+  const claimed = (tagId, evidence) => ({ tagId, source: 'manual', confidence: 1,
+    verificationLevel: 'claimed', reviewStatus: 'approved', evidence,
+    reviewedByUserId: null, reviewedAt: null, assignedAt: now });
+  for (const entry of companyProfileTagEntries(company.technologies, company.qualifications)) {
+    const tag = await findOrCreateCatalogTag(entry);
+    if (tag) derived.push(claimed(tag._id, entry.evidence));
+  }
+  const ids = (company.tags || []).map(link => link.tagId);
+  const catalog = ids.length ? await getDatabase().collection('tags').find({
+    _id: { $in: ids }, status: { $ne: 'inactive' }, matchingExcluded: { $ne: true }
+  }).toArray() : [];
+  for (const tag of catalog) derived.push(claimed(tag._id,
+    `Self-reported company service selection: ${tag.contractorLabel || tag.text || tag.name || tag._id}`));
+  return mergeProfileAssignments(company.tagAssignments, derived);
+}
+
+function unchangedProfile(company) {
+  // Detect concurrent profile/evidence edits rather than overwriting their data.
+  const filter = { _id: company._id };
+  for (const key of ['updatedAt', 'tags', 'tagAssignments']) {
+    filter[key] = Object.hasOwn(company, key) ? company[key] : { $exists: false };
+  }
+  return filter;
+}
+
 export async function updateCompanyProfile(companyId, profile) {
   const id = toObjectId(companyId, 'companyId');
-  const current = await companies().findOne({ _id: id }, { projection: { qualifications: 1, contact: 1, tags: 1 } });
+  const current = await companies().findOne({ _id: id });
   if (!current) return null;
-
-  let linkedTags;
+  let linkedTags = current.tags || [];
   if (Object.hasOwn(profile, 'tags')) {
-    const currentIds = new Set((current.tags || []).map((link) => String(link.tagId)));
-    const addedIds = profile.tags.map((link) => link.tagId).filter((tagId) => !currentIds.has(tagId));
-    // Existing inactive/missing links can survive unrelated profile edits, but
-    // newly selected links must point to active catalog records.
+    const currentIds = new Set(linkedTags.map(link => String(link.tagId)));
+    const addedIds = profile.tags.map(link => link.tagId).filter(tagId => !currentIds.has(tagId));
     if (addedIds.length) await assertActiveTagIds(addedIds);
     linkedTags = profile.tags.map(({ tagId }) => ({ tagId: toObjectId(tagId, 'tagId') }));
   }
-
-  const now = new Date();
-  const updated = await companies().findOneAndUpdate(
-    { _id: id },
-    {
-      $set: {
-        displayName: profile.displayName,
-        ...(Object.hasOwn(profile, 'description') ? { description: profile.description } : {}),
-        ...(Object.hasOwn(profile, 'certifications') ? { certifications: profile.certifications } : {}),
-        companySize: profile.companySize,
-        district: profile.district,
-        technologies: profile.technologies,
-        qualifications: mergeQualifications(current.qualifications, profile.qualifications),
-        contact: { ...(current.contact && typeof current.contact === 'object' ? current.contact : {}), email: profile.contactEmail },
-        ...(linkedTags ? { tags: linkedTags } : {}),
-        updatedAt: now
-      }
-    },
-    { returnDocument: 'after' }
-  );
+  const changes = {
+    displayName: profile.displayName,
+    ...(Object.hasOwn(profile, 'description') ? { description: profile.description } : {}),
+    ...(Object.hasOwn(profile, 'certifications') ? { certifications: profile.certifications } : {}),
+    companySize: profile.companySize, district: profile.district,
+    technologies: profile.technologies,
+    qualifications: mergeQualifications(current.qualifications, profile.qualifications),
+    contact: { ...(current.contact && typeof current.contact === 'object' ? current.contact : {}), email: profile.contactEmail },
+    tags: linkedTags
+  };
+  // Resolve and validate before committing. Profile and matching links change in
+  // one atomic company-document write; a resolution error saves neither.
+  const tagAssignments = await profileAssignments({ ...current, ...changes });
+  const updated = await companies().findOneAndUpdate(unchangedProfile(current), {
+    $set: { ...changes, tagAssignments, updatedAt: new Date() }
+  }, { returnDocument: 'after' });
+  if (!updated) throw httpError(409, 'PROFILE_CHANGED', 'Your company profile changed. Reload it and save again.');
   return updated;
 }
 
 export async function syncCompanyProfileTagAssignments(companyId) {
-  const id = toObjectId(companyId, 'companyId');
-  const company = await companies().findOne({ _id: id }, { projection: { technologies: 1, qualifications: 1, tagAssignments: 1 } });
+  const company = await companies().findOne({ _id: toObjectId(companyId, 'companyId') });
   if (!company) return null;
-
-  const profileAssignments = [];
-  const profileTagIds = new Set();
-  for (const entry of companyProfileTagEntries(company.technologies, company.qualifications)) {
-    const tag = await findOrCreateCatalogTag(entry);
-    if (!tag) continue; // Respect catalog deactivation; never silently re-enable it.
-    if (profileTagIds.has(String(tag._id))) continue;
-    profileTagIds.add(String(tag._id));
-    profileAssignments.push({
-      tagId: tag._id,
-      source: 'manual',
-      confidence: 1,
-      verificationLevel: 'claimed',
-      reviewStatus: 'approved',
-      evidence: entry.evidence,
-      reviewedByUserId: null,
-      reviewedAt: null,
-      assignedAt: new Date()
-    });
-  }
-
-  // Profile-derived links follow the current profile. Preserve any separate
-  // assignments the company explicitly manages in Matching setup.
-  const isProfileLink = (assignment) => assignment.source === 'manual'
-    && typeof assignment.evidence === 'string'
-    && assignment.evidence.startsWith('Self-reported company profile ');
-  const preserved = (company.tagAssignments || []).filter((assignment) => !isProfileLink(assignment));
-  const preservedTagIds = new Set(preserved.map((assignment) => assignment.tagId?.toString()).filter(Boolean));
-  const merged = [...preserved, ...profileAssignments.filter((assignment) => !preservedTagIds.has(assignment.tagId.toString()))];
-  const now = new Date();
-  await companies().updateOne({ _id: id }, { $set: { tagAssignments: merged, updatedAt: now } });
-  return merged;
+  const tagAssignments = await profileAssignments(company);
+  const result = await companies().updateOne(unchangedProfile(company), {
+    $set: { tagAssignments, updatedAt: new Date() }
+  });
+  if (!result.matchedCount) throw httpError(409, 'PROFILE_CHANGED', 'Your company profile changed. Reload it and try again.');
+  return tagAssignments;
 }
 
 export async function findCompanyByTaxId(taxId) {

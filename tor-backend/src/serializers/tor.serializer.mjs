@@ -1,3 +1,4 @@
+import { usableTorTagAssignment } from '../services/tor-tag-eligibility.mjs';
 const REMOVED_ENRICHMENT_FIELDS = ['opend', 'opendLookup', 'province', 'district', 'subdistrict', 'projectLocation', 'projectMoney', 'referencePrice', 'totalContractValue', 'contractProjectStatus', 'contracts', 'opendUpdatedAt', 'locationFilter'];
 
 import { normalizeTorDocuments } from '../models/tor-document.mjs';
@@ -9,9 +10,9 @@ export function serializeTor(tor) {
   const result = {
     ...project, projectId,
     documents: normalizeTorDocuments(tor.documents ?? []),
-    // Stored TOR tags are usable regardless of their review stage.
+    // Display only assignments eligible for automatic matching.
     tagAssignments: Array.isArray(tor.tagAssignments)
-      ? tor.tagAssignments.filter((assignment) => assignment?.tagId)
+      ? tor.tagAssignments.filter(assignment => usableTorTagAssignment(tor, assignment))
       : [],
     scope: tor.scope ?? 'department',
     identityScope: tor.identityScope ?? (projectId?.startsWith('P') ? 'plan' : 'project'),

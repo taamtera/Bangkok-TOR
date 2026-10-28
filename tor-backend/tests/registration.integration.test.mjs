@@ -49,6 +49,21 @@ test('registration accepts minimal company data and rejects names the database c
       const user = await target.collection('users').findOne({ email: body.user.email });
       const saved = await target.collection('companies').findOne({ _id: user.companyId });
       assert.equal(saved.companySize, 'Not specified');
+      const origin = url.replace(/\/register$/, '');
+      const oldCookie = response.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
+      const signedOut = await fetch(origin + '/logout', { method: 'POST', headers: { cookie: oldCookie } });
+      assert.equal(signedOut.status, 200);
+      assert.equal((await fetch(origin + '/me', { headers: { cookie: oldCookie } })).status, 401);
+      const login = password => fetch(origin + '/login', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: body.user.email, password }) });
+      assert.equal((await login('Wrong-Temporary-Password-123!')).status, 401);
+      const signedIn = await login('Temporary-Test-Password-123!');
+      assert.equal(signedIn.status, 200);
+      const cookie = signedIn.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
+      const me = await fetch(origin + '/me', { headers: { cookie } });
+      assert.equal(me.status, 200);
+      assert.equal((await me.json()).user.id, body.user.id);
+
     }
     for (const company of [{ legalName: 'A' }, { legalName: 'Test Company', displayName: 'A' }]) {
       const before = await target.collection('companies').countDocuments();
@@ -58,7 +73,7 @@ test('registration accepts minimal company data and rejects names the database c
       assert.equal(body.error.code, 'VALIDATION_ERROR');
       assert.equal(await target.collection('companies').countDocuments(), before);
     }
-    assert.equal(await target.collection('sessions').countDocuments(), 2);
+    assert.equal(await target.collection('sessions').countDocuments(), 4);
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
     await closeDatabase();

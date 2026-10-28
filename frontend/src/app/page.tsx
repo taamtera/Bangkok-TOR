@@ -10,7 +10,6 @@ import {
 } from '@/types';
 import * as authApi from '@/lib/authApi';
 import * as companyProfileApi from '@/lib/companyProfileApi';
-import { saveCompanyAssignments } from '@/lib/tagApi';
 import * as torApi from '@/lib/torApi';
 import { companyDataToProfile, profileToCompanyData, safeUserToProfile } from '@/lib/userProfile';
 import { Header } from '@/components/Header';
@@ -144,6 +143,16 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [currentUser?.id]);
   const [selectedContract, setSelectedContract] = useState<TORContract | null>(null);
+  useEffect(() => {
+    const projectId = new URLSearchParams(window.location.search).get('project');
+    if (!projectId) return;
+    let cancelled = false;
+    torApi.getTor(projectId).then(project => {
+      if (!cancelled) setSelectedContract(torApi.toTorContract(project));
+    }).catch(() => { if (!cancelled) setTorLoadError('The linked TOR could not be loaded.'); });
+    return () => { cancelled = true; };
+  }, []);
+
   
   // Auth Modal State
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
@@ -177,21 +186,6 @@ export default function Home() {
 
   const saveCompanyProfile = async (updated: SoftwareHouseProfile) => {
     const company = await companyProfileApi.updateMyCompanyProfile(profileToCompanyData(updated));
-    // Capabilities for matching come ONLY from catalog tags. This endpoint rejects
-    // any tag that is not an active catalog tag, so the frontend can never create
-    // tags — the backend keeps its own tag-creation ability untouched.
-    if (updated.companyId) {
-      const assignments = (updated.tags ?? []).map((tag) => ({
-        tagId: tag.tagId,
-        verificationLevel: 'claimed' as const,
-        evidence: 'Selected from company profile.'
-      }));
-      try {
-        await saveCompanyAssignments(updated.companyId, assignments);
-      } catch {
-        // Profile fields saved; matching links can be retried from the profile.
-      }
-    }
     setCurrentUser((user) => user?.id === updated.id ? companyDataToProfile(updated, company) : user);
   };
 

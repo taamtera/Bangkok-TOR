@@ -1,0 +1,71 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { once } from 'node:events';
+import dns from 'node:dns';
+import dotenv from 'dotenv';
+import { ObjectId } from 'mongodb';
+test('isolated alert worker, outbox and preference API', { skip: process.env.AUTO_ALERT_DB_TEST !== '1', timeout: 90000 }, async () => {
+  dotenv.config({ path: new URL('../.env', import.meta.url), quiet: true });
+  const originalName = process.env.MONGODB_DB_NAME;
+  const name = `alert_test_${randomUUID().replaceAll('-', '').slice(0, 24)}`;
+  assert.match(name, /^alert_test_[a-f0-9]{24}$/); assert.notEqual(name, originalName);
+  process.env.MONGODB_DB_NAME = name; process.env.NODE_ENV = 'test';
+  dns.setServers(['1.1.1.1', '8.8.8.8']);
+  const { connectDatabase, closeDatabase } = await import('../src/config/database.mjs');
+  const { scanTorAlerts } = await import('../src/services/automatic-match-alerts.mjs');
+  const { queueMatchEmails, deliverMatchEmails } = await import('../src/services/match-alert-email.mjs');
+  let db, server;
+  try {
+    db = await connectDatabase();
+    const tor = { _id: new ObjectId(), projectId: 'fixture-project', title: 'Fixture service', status: 'invitation_published' };
+    await db.collection('tor_announcements').insertOne(tor);
+    let calls = 0; const refresh = async () => { calls++; };
+    assert.equal((await scanTorAlerts({ db, refresh })).baselined, true); assert.equal(calls, 0);
+    await scanTorAlerts({ db, refresh }); assert.equal(calls, 0);
+    await db.collection('tor_announcements').updateOne({ _id: tor._id }, { $set: { title: 'Changed' } });
+    await assert.rejects(scanTorAlerts({ db, refresh: async () => { throw new Error('fixture'); } }));
+    await scanTorAlerts({ db, refresh }); assert.equal(calls, 1);
+    await scanTorAlerts({ db, refresh }); assert.equal(calls, 1);
+    const state = db.collection('match_alert_state');
+    await state.updateOne({ _id: 'scan-lock' }, { $set: { expiresAt: new Date(Date.now() + 60000) } });
+    assert.deepEqual(await scanTorAlerts({ db, refresh }), { busy: true });
+    await state.updateOne({ _id: 'scan-lock' }, { $set: { expiresAt: new Date(0) } });
+    const user = { _id: new ObjectId(), companyId: new ObjectId(), status: 'active', email: 'fixture@example.invalid',
+      notificationPreferences: { matchEmailOptIn: true, channels: ['in_app', 'email'], alertTypes: ['new_match'] } };
+    const match = { companyId: user.companyId, torId: tor._id, torVersion: 1, resultType: 'requirement_match', status: 'compared', score: 60 };
+    await db.collection('users').insertOne(user); await db.collection('company_matches').insertOne(match);
+    process.env.MATCH_ALERT_EMAIL_ENABLED = 'true';
+    await queueMatchEmails([match], [tor], [user]); await queueMatchEmails([match], [tor], [user]);
+    const queue = db.collection('match_email_outbox'); assert.equal(await queue.countDocuments(), 1);
+    let sent = 0; const send = async () => { sent++; };
+    await Promise.all([deliverMatchEmails({ db, send, enabled: true }), deliverMatchEmails({ db, send, enabled: true })]);
+    assert.equal(sent, 1); assert.equal((await queue.findOne({})).status, 'sent');
+    const resetQueue = async () => { await queue.updateMany({}, { $set: { status: 'queued', attempts: 0, nextAttemptAt: new Date(0) } }); };
+    await resetQueue(); await db.collection('users').updateOne({ _id: user._id }, { $set: { 'notificationPreferences.matchEmailOptIn': false } });
+    await deliverMatchEmails({ db, send, enabled: true }); assert.equal(sent, 1); assert.equal((await queue.findOne({})).status, 'cancelled');
+    await db.collection('users').updateOne({ _id: user._id }, { $set: { 'notificationPreferences.matchEmailOptIn': true } });
+    await resetQueue();
+    await deliverMatchEmails({ db, enabled: true, send: async () => { throw Object.assign(new Error('fixture'), { code: 'ECONNREFUSED' }); } });
+    assert.equal((await queue.findOne({})).status, 'queued');
+    await resetQueue(); await deliverMatchEmails({ db, enabled: true, send: async () => { throw new Error('ambiguous'); } });
+    assert.equal((await queue.findOne({})).status, 'uncertain');
+    await deliverMatchEmails({ db, send, enabled: true }); assert.equal(sent, 1);
+    const sid = new ObjectId();
+    await db.collection('sessions').insertOne({ _id: sid, userId: user._id, status: 'active', revokedAt: null, expiresAt: new Date(Date.now() + 60000) });
+    const { signAccessToken } = await import('../src/utils/tokens.mjs');
+    const token = signAccessToken({ sub: String(user._id), sid: String(sid) });
+    const { app } = await import('../src/app.mjs'); server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
+    const url = `http://127.0.0.1:${server.address().port}/api/notifications/preferences`;
+    assert.equal((await fetch(url)).status, 401);
+    const headers = { cookie: `tor_access=${token}`, 'content-type': 'application/json' };
+    assert.equal((await fetch(url, { method: 'PATCH', headers, body: JSON.stringify({ emailAlerts: false, userId: String(new ObjectId()) }) })).status, 400);
+    assert.equal((await fetch(url, { method: 'PATCH', headers, body: JSON.stringify({ emailAlerts: false }) })).status, 200);
+    assert.equal((await (await fetch(url, { headers })).json()).emailAlerts, false);
+    assert.equal((await db.collection('users').findOne({ _id: user._id })).notificationPreferences.matchEmailOptIn, false);
+  } finally {
+    if (server) await new Promise(resolve => server.close(resolve));
+    if (db) { assert.equal(db.databaseName, name); await db.dropDatabase(); }
+    await closeDatabase();
+  }
+});

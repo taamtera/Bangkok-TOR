@@ -1,3 +1,4 @@
+import { queueMatchEmails } from '../services/match-alert-email.mjs';
 import { getDatabase } from '../config/database.mjs';
 import { toObjectId } from '../utils/object-id.mjs';
 import { newMatchEvents, serializeNotification } from '../services/notification-events.mjs';
@@ -12,9 +13,10 @@ export async function publishMatchNotifications(records, projects) {
   if (!companyIds.length) return;
   const users = await getDatabase().collection('users').find({
     companyId: { $in: companyIds }, status: 'active', deletedAt: null,
-    'notificationPreferences.channels': 'in_app', 'notificationPreferences.alertTypes': 'new_match'
+    'notificationPreferences.alertTypes': 'new_match'
   }, { projection: { companyId: 1, status: 1, notificationPreferences: 1 } }).toArray();
   const events = newMatchEvents(records, projects, users);
+  await queueMatchEmails(records, projects, users);
   if (!events.length) return;
   try {
     await collection().bulkWrite(events.map(event => ({ updateOne: {

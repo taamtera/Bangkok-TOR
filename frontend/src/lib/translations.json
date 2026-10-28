@@ -361,5 +361,9 @@
   "No notifications yet. New requirement matches will appear here.": "ยังไม่มีการแจ้งเตือน ผลการจับคู่ข้อกำหนดใหม่จะแสดงที่นี่",
   "View TOR": "ดู TOR",
   "This TOR is no longer available.": "ไม่พบ TOR นี้แล้ว",
-  "New TOR requirement match": "พบ TOR ที่ตรงกับข้อกำหนดใหม่"
+  "New TOR requirement match": "พบ TOR ที่ตรงกับข้อกำหนดใหม่",
+  "Email me when new TORs match my company": "ส่งอีเมลเมื่อมี TOR ใหม่ที่ตรงกับบริษัทของฉัน",
+  "Email alerts are not available yet.": "ยังไม่สามารถส่งการแจ้งเตือนทางอีเมลได้",
+  "Could not load email alert settings.": "ไม่สามารถโหลดการตั้งค่าการแจ้งเตือนทางอีเมลได้",
+  "The linked TOR could not be loaded.": "ไม่สามารถโหลด TOR จากลิงก์ได้"
 }

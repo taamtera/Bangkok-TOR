@@ -39,3 +39,20 @@ export function companyProfileTagEntries(technologies = [], qualifications = [])
   }
   return [...entries.values()];
 }
+
+// Profile edits own only self-reported links; independent evidence stays intact.
+export function mergeProfileAssignments(existing = [], derived = []) {
+  const managed = assignment => assignment.source === 'manual'
+    && assignment.verificationLevel === 'claimed'
+    && typeof assignment.evidence === 'string'
+    && (assignment.evidence.startsWith('Self-reported company profile ')
+      || assignment.evidence.startsWith('Self-reported company service selection: ')
+      || assignment.evidence === 'Selected from company profile.');
+  const preserved = existing.filter(assignment => !managed(assignment));
+  const ids = new Set(preserved.map(assignment => String(assignment.tagId)));
+  return [...preserved, ...derived.filter(assignment => {
+    const id = String(assignment.tagId);
+    if (ids.has(id)) return false;
+    ids.add(id); return true;
+  })];
+}

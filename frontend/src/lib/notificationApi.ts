@@ -28,3 +28,14 @@ export const listNotifications = (page = 1, limit = 20, signal?: AbortSignal) =>
   request<NotificationPage>(`?page=${page}&limit=${limit}`, 'GET', signal);
 export const markNotificationRead = (id: string) => request(`/${encodeURIComponent(id)}/read`, 'PATCH');
 export const markAllNotificationsRead = () => request('/read-all', 'PATCH');
+
+export interface NotificationPreferences { emailAlerts: boolean; emailAvailable: boolean }
+export const getNotificationPreferences = (signal?: AbortSignal) => request<NotificationPreferences>('/preferences', 'GET', signal);
+export async function updateNotificationPreferences(emailAlerts: boolean): Promise<NotificationPreferences> {
+  const response = await fetchWithSessionRefresh(resolveApiUrl('/api/notifications/preferences')!, {
+    method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ emailAlerts })
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error?.message || 'Could not save notification preferences.');
+  return body;
+}

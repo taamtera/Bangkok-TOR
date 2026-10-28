@@ -149,6 +149,7 @@ const collectionDefinitions = {
             bsonType: 'array',
             items: { enum: ['new_match', 'tor_updated', 'deadline_reminder'] }
           },
+          matchEmailOptIn: { bsonType: 'bool' },
           deadlineReminderDays: { bsonType: ['int', 'long'], minimum: 1, maximum: 30 }
         }
       },

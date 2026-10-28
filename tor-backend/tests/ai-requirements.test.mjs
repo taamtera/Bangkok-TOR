@@ -8,30 +8,26 @@ import { authenticateAiWorker } from '../src/middleware/authenticate-ai-worker.m
 import { prepareMatchingTors } from '../src/services/requirement-input.mjs';
 import { runPythonMatching } from '../src/services/python-matching.mjs';
 
-test('stored TOR tags are matching requirements regardless of review stage', async () => {
+test('reviewed AI suggestions match automatically while rejected and unreviewed assignments do not', async () => {
   const tagId = new ObjectId();
   const tags = [{ _id: tagId, text: 'Internet Service', status: 'active' }];
-  const tors = ['suggested', 'approved', 'rejected', 'validated', undefined].map((reviewStatus) => ({
-    _id: new ObjectId(), projectId: String(reviewStatus), tagAssignments: [{
-      tagId, requirementLevel: 'required', evidence: 'Internet Service', reviewStatus
-    }]
-  }));
+  const cases = [
+    { reviewStatus: 'suggested', reviewed: true, expected: true },
+    { reviewStatus: 'suggested', reviewed: false, expected: false },
+    { reviewStatus: 'approved', expected: true },
+    { reviewStatus: 'validated', expected: true },
+    { reviewStatus: 'rejected', reviewed: true, expected: false },
+    { reviewStatus: undefined, expected: false }
+  ];
+  const tors = cases.map((item, index) => ({ _id: new ObjectId(), projectId: String(index),
+    aiProcessing: { status: 'completed', tagReviewStatus: item.reviewed ? 'approved' : 'pending' },
+    tagAssignments: [{ tagId, requirementLevel: 'required', evidence: 'Internet Service',
+      source: 'ai', confidence: 0.9, reviewStatus: item.reviewStatus }] }));
   const prepared = prepareMatchingTors(tors, tags, new Map(), []);
-  for (const tor of prepared) {
-    assert.equal(tor.matchingRequirements.length, 1);
-    assert.equal(tor.matchingRequirements[0].text, 'Internet Service');
-    assert.equal(tor.matchingRequirements[0].tagId, String(tagId));
-  }
-  const result = await runPythonMatching({
-    companies: [{ _id: 'test-company', technologies: ['Internet Service'] }],
-    activeTags: tags.map(tag => ({ ...tag, name: tag.text })),
-    tors: prepared
-  });
-  assert.equal(result.items.length, tors.length);
-  for (const item of result.items) {
-    assert.equal(item.status, 'compared');
-    assert.equal(item.requirementMatches[0].status, 'met');
-  }
+  prepared.forEach((tor, index) => assert.equal(tor.matchingRequirements.length, cases[index].expected ? 1 : 0));
+  const result = await runPythonMatching({ companies: [{ _id: 'company', technologies: ['Internet Service'] }],
+    activeTags: tags.map(tag => ({ ...tag, name: tag.text })), tors: prepared });
+  result.items.forEach((item, index) => assert.equal(item.status, cases[index].expected ? 'compared' : 'requirements_unavailable'));
 });
 
 test('review metadata cannot cause a repeated stored tag to inflate requirement weight', () => {
