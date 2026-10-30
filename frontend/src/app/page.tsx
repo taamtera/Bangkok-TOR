@@ -106,6 +106,18 @@ export default function Home() {
     void refresh(true);
     return () => { controller.abort(); clearTimeout(timer); };
   }, [queryKey, effectivePage, torRefreshKey]);
+
+  // Dashboard aggregates need ALL TORs, not just the current page. The API caps
+  // limit at 100 (~73 TORs today); if the catalog exceeds 100 this would need paging.
+  const [dashboardContracts, setDashboardContracts] = useState<TORContract[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    torApi.listTors({ limit: 100 }, controller.signal)
+      .then((result) => { if (!controller.signal.aborted) setDashboardContracts(result.items); })
+      .catch(() => { /* dashboard falls back to empty aggregates */ });
+    return () => controller.abort();
+  }, [torRefreshKey]);
+
   const changePage = (value: number) => {
     setPageQueryKey(queryKey); setPage(value);
     document.getElementById('project-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -189,13 +201,13 @@ export default function Home() {
     setCurrentUser((user) => user?.id === updated.id ? companyDataToProfile(updated, company) : user);
   };
 
-  // Total budget volume formatted
+  // Total budget volume formatted — computed over the full dashboard dataset.
   const totalBudgetFormatted = useMemo(() => {
-    const knownBudgets = contracts.filter(project => project.price !== null);
+    const knownBudgets = dashboardContracts.filter(project => project.price !== null);
     if (!knownBudgets.length) return t("Not available");
     const total = knownBudgets.reduce((acc, project) => acc + (project.price ?? 0), 0);
-    return `${(total / 1000000).toFixed(1)}M THB${knownBudgets.length < contracts.length ? ' (known budgets)' : ''}`;
-  }, [contracts]);
+    return `${(total / 1000000).toFixed(1)}M THB`;
+  }, [dashboardContracts]);
 
   // Handlers
   const handleOpenAuth = (mode: 'login' | 'signin') => {
@@ -290,12 +302,12 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
             
             {/* Banner Section (Dash board) */}
             <DashboardHero
-              totalTORs={totalAll}
+              totalTORs={dashboardContracts.length || totalAll}
               totalBudgetFormatted={totalBudgetFormatted}
             />
 
             {/* Dashboard Stats */}
-            <DashboardStats />
+            <DashboardStats contracts={dashboardContracts} />
 
           </div>
         )}
