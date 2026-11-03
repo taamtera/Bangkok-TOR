@@ -13,11 +13,13 @@ import {
 interface DashboardHeroProps {
   totalTORs: number;
   totalBudgetFormatted: string;
+  avgMatchScore?: number | null;
 }
 
 export const DashboardHero: React.FC<DashboardHeroProps> = ({
   totalTORs,
-  totalBudgetFormatted
+  totalBudgetFormatted,
+  avgMatchScore = null
 }) => {
   const { t } = useLanguage();
   return (
@@ -66,11 +68,8 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
               <Cpu className="w-4 h-4" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("Vertex AI Match")}</p>
-                <span title={t('Placeholder data — no live source yet')} className="text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700/80 text-slate-500 dark:text-slate-300 border border-slate-300/60 dark:border-slate-600/60">{t('Demo')}</span>
-              </div>
-              <p className="text-xl font-bold text-slate-900 dark:text-white">98.4% <span className="text-xs font-normal text-slate-500">{t("accuracy")}</span></p>
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("Avg AI Match")}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-white tabular-nums">{avgMatchScore !== null ? `${avgMatchScore}%` : '—'} <span className="text-xs font-normal text-slate-500">{t("avg score")}</span></p>
             </div>
           </div>
         </div>

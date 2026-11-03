@@ -15,6 +15,7 @@ import { companyDataToProfile, profileToCompanyData, safeUserToProfile } from '@
 import { Header } from '@/components/Header';
 import { DashboardHero } from '@/components/DashboardHero';
 import { DashboardStats } from '@/components/DashboardStats';
+import { getDashboardStats, type DashboardStats as DashboardStatsData } from '@/lib/dashboardApi';
 import { FilterBar } from '@/components/FilterBar';
 import { TORCard } from '@/components/TORCard';
 import { TORDetailModal } from '@/components/TORDetailModal';
@@ -110,11 +111,15 @@ export default function Home() {
   // Dashboard aggregates need ALL TORs, not just the current page. The API caps
   // limit at 100 (~73 TORs today); if the catalog exceeds 100 this would need paging.
   const [dashboardContracts, setDashboardContracts] = useState<TORContract[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStatsData | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     torApi.listTors({ limit: 100 }, controller.signal)
       .then((result) => { if (!controller.signal.aborted) setDashboardContracts(result.items); })
       .catch(() => { /* dashboard falls back to empty aggregates */ });
+    getDashboardStats(controller.signal)
+      .then((data) => { if (!controller.signal.aborted) setDashboardStats(data); })
+      .catch(() => { /* live DB metrics unavailable; cards show a dash */ });
     return () => controller.abort();
   }, [torRefreshKey]);
 
@@ -304,10 +309,11 @@ ${t('Downloaded from Thailand TOR Intelligence Platform (2026)')}
             <DashboardHero
               totalTORs={dashboardContracts.length || totalAll}
               totalBudgetFormatted={totalBudgetFormatted}
+              avgMatchScore={dashboardStats?.matches.avgScore ?? null}
             />
 
             {/* Dashboard Stats */}
-            <DashboardStats contracts={dashboardContracts} />
+            <DashboardStats contracts={dashboardContracts} stats={dashboardStats} />
 
           </div>
         )}
