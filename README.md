@@ -309,78 +309,78 @@ Optional crawler-support collections (`sources`, `organizations`, `procurement_p
 
 ## API Routes
 
-All routes are prefixed with `/api`. Protected routes require a valid access token. "Company" means `company_admin` or `company_member`; "PM" means `project_manager`.
+All routes are prefixed with `/api`. Protected routes require a valid access token (`Bearer <token>` or authenticated cookie). "Company" means `company_admin` or `company_member`; "PM" means `project_manager`.
 
 ### System
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api` | Public | Service status and request ID |
-| `GET` | `/api/health` | Public | Database ping and uptime |
-| `GET` | `/api/dashboard/stats` | Public | Aggregate dashboard statistics |
+| Method | Endpoint | Access | Parameters / Return Example | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api` | Public | **Response**: `{ "service": "TOR Software API", "status": "running", "requestId": "..." }` | Service status and request ID |
+| `GET` | `/api/health` | Public | **Response**: `{ "status": "ok", "service": "tor-software-backend", "database": "connected", "timestamp": "2026-11-14T..." }` | Database ping and uptime verification |
+| `GET` | `/api/dashboard/stats` | Public | **Response**: `{ "matches": { "total": 45, "avg": 76.5 }, "vendors": 18, "crawls": { "runs": 12, "items": 840 }, "topDemand": [{ "name": "Node.js", "count": 14 }] }` | Aggregate statistics across matches, vendors, and tags |
 
 ### Authentication
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Public | Register user and company |
-| `POST` | `/api/auth/login` | Public | Log in; issues access token and refresh cookie |
-| `POST` | `/api/auth/refresh` | Public | Refresh access token |
-| `POST` | `/api/auth/logout` | Public | End current session |
-| `POST` | `/api/auth/logout-all` | Authenticated | End all sessions |
-| `POST` | `/api/auth/forgot-password` | Public | Send password reset link |
-| `POST` | `/api/auth/reset-password` | Public | Reset password with token |
-| `GET` | `/api/auth/session` | Public | Inspect current session |
-| `GET` | `/api/auth/me` | Authenticated | Current user profile |
+| Method | Endpoint | Access | Parameters / Return Example | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | Public | **Body**: `{ email, password, firstName, lastName, phone?, companyName, companySize?, district? }` | Register new user and software house profile |
+| `POST` | `/api/auth/login` | Public | **Body**: `{ email, password }` | Authenticate; returns access token and sets refresh cookie |
+| `POST` | `/api/auth/refresh` | Public | **Cookie**: `tor_refresh_token` | Issue new access token using refresh token |
+| `POST` | `/api/auth/logout` | Public | **Cookie**: `tor_refresh_token` | Invalidate current session and clear cookies |
+| `POST` | `/api/auth/logout-all` | Authenticated | None | Revoke all active sessions for current user |
+| `POST` | `/api/auth/forgot-password` | Public | **Body**: `{ email }` | Generate and dispatch password reset link |
+| `POST` | `/api/auth/reset-password` | Public | **Body**: `{ token, newPassword }` | Reset password using one-time token |
+| `GET` | `/api/auth/session` | Public | **Response**: `{ "authenticated": true, "user": { "id": "...", "email": "user@example.com", "role": "company_admin" } }` | Inspect current session authentication state |
+| `GET` | `/api/auth/me` | Authenticated | **Response**: `{ "user": { "id": "...", "email": "...", "role": "company_admin", "companyId": "...", "profile": { "firstName": "..." } } }` | Retrieve authenticated user profile and roles |
 
 ### TOR Announcements
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/tors` | Public | Paginated list; supports `search`, `departmentId`, `procurementMethod`, `stage`, `stageScope`, `fromDate`, `toDate`, `sort`, `page`, `limit` |
-| `GET` | `/api/tors/:projectId` | Public | Project detail with stage observations |
-| `PATCH` | `/api/tors/:projectId` | PM / system admin | Update editable fields |
-| `GET` | `/api/tors/documents/:projectId` | Public | Inline document preview (proxied) |
-| `GET` | `/api/tors/documents/:projectId/download` | Public | Document download (proxied) |
-| `GET` | `/api/tors/:projectId/evaluation` | Company | Read company-specific AI evaluation |
-| `POST` | `/api/tors/:projectId/evaluation` | Company | Request evaluation via n8n |
-| `GET` | `/api/thumbnail/:projectId` | Public | WebP thumbnail (`404` if missing or stale) |
+| Method | Endpoint | Access | Parameters / Return Example | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/tors` | Public | **Response**: `{ "items": [{ "projectId": "P670001", "title": "พัฒนาระบบ...", "departmentName": "กทม.", "status": "invitation_published", "publishedAt": "2026-10-15" }], "pagination": { "page": 1, "limit": 20, "total": 150, "totalPages": 8 } }` | Paginated TOR list with filters (`search`, `departmentId`, `stage`, etc.) |
+| `GET` | `/api/tors/:projectId` | Public | **Response**: `{ "tor": { "projectId": "P670001", "title": "...", "status": "invitation_published", "stageObservations": { "D0": { "publishedAt": "2026-10-15" } }, "tagAssignments": [...] } }` | Single project detail with stage observations |
+| `PATCH` | `/api/tors/:projectId` | PM / System admin | **Path**: `projectId`<br/>**Body**: `{ title?, description?, summary?, category?, departmentName?, publishedAt?, submissionDeadline?, projectStartAt?, projectEndAt?, sourceUrl?, url?, documentUrl?, thumbnail?, status?, budget?, documents? }` | Update editable project fields |
+| `GET` | `/api/tors/documents/:projectId` | Public | **Response**: Streamed binary PDF (`application/pdf`) or sandboxed HTML preview | Stream proxied real e-GP document for in-browser viewer |
+| `GET` | `/api/tors/documents/:projectId/download` | Public | **Response**: Binary stream (`Content-Disposition: attachment; filename="P670001.pdf"`) | Download proxied official document attachment |
+| `GET` | `/api/tors/:projectId/evaluation` | Company | **Response**: `{ "status": "completed", "score": 85, "strengths": ["ทีมมีประสบการณ์ Cloud"], "gaps": ["ขาดใบรับรอง ISO 27001"], "summary": "..." }` | Retrieve existing company-specific AI evaluation |
+| `POST` | `/api/tors/:projectId/evaluation` | Company | **Path**: `projectId` | Request on-demand evaluation via n8n webhook |
+| `GET` | `/api/thumbnail/:projectId` | Public | **Response**: Binary WebP image (`Content-Type: image/webp`, 404 if missing or stale) | Stream decoded first-page WebP thumbnail |
 
 ### Companies, Matching & Recommendations
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/companies/me` | Company | Read own company profile |
-| `PUT` | `/api/companies/me` | Company | Update own company profile |
-| `POST` | `/api/companies/me/matching-tags/sync` | Company | Sync profile entries to controlled tags |
-| `GET` | `/api/matches` | Company | Requirement matches for own company |
-| `GET` | `/api/matches/ai-input` | Company | Structured input for AI review |
-| `GET` | `/api/recommendations` | Company | Recommendation status (`not_configured` until connected) |
+| Method | Endpoint | Access | Parameters / Return Example | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/companies/me` | Company | **Response**: `{ "company": { "displayName": "Siam Software", "technologies": ["Node.js", "MongoDB"], "certifications": ["ISO 27001"], "district": "Chatuchak", "companySize": "Small" } }` | Retrieve own company profile |
+| `PUT` | `/api/companies/me` | Company | **Body**: `{ legalName, displayName?, district?, description?, website?, phone?, contactEmail?, size?, certifications?, technologies?, qualifications? }` | Update own software house profile |
+| `POST` | `/api/companies/me/matching-tags/sync` | Company | None | Sync profile technologies to controlled taxonomy tags |
+| `GET` | `/api/matches` | Company | **Response**: `{ "items": [{ "torId": "P670001", "score": 88, "evidenceScore": 75, "status": "compared", "requirementMatches": [{ "clauseId": "c1", "status": "met" }] }], "total": 12 }` | Policy 3 deterministic requirement matches |
+| `GET` | `/api/matches/ai-input` | Company | **Response**: `{ "companyId": "...", "companyCapabilities": [{ "tagId": "...", "text": "Node.js", "verificationLevel": "verified" }], "certifications": [...] }` | Structured matching capabilities for AI review |
+| `GET` | `/api/recommendations` | Company | **Response**: `{ "resultType": "ai_recommendation", "status": "not_configured", "items": [], "message": "AI project recommendations are not available yet." }` | Status of AI recommendation feed (`not_configured`) |
 
 ### Tags
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/tags` | Public | List active tags (`category`, `search`) |
-| `POST` | `/api/tags` | System admin | Create tag |
-| `GET` | `/api/tags/:tagId` | System admin | Read tag |
-| `PATCH` | `/api/tags/:tagId` | System admin | Update tag |
-| `DELETE` | `/api/tags/:tagId` | System admin | Deactivate tag (soft delete) |
-| `GET` | `/api/tags/companies/:companyId` | Authenticated | Company tag assignments |
-| `PUT` | `/api/tags/companies/:companyId` | Authenticated | Replace company tag assignments |
-| `PUT` | `/api/tags/tors/:projectId` | PM / system admin | Replace TOR tag assignments |
-| `GET` | `/api/tags/tors/:projectId/suggestions` | PM / system admin | List AI tag suggestions |
-| `PUT` | `/api/tags/tors/:projectId/suggestions` | PM / system admin | Submit AI tag suggestions |
-| `PATCH` | `/api/tags/tors/:projectId/suggestions/:suggestionId` | PM / system admin | Approve or reject a suggestion |
+| Method | Endpoint | Access | Parameters / Return Example | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/tags` | Public | **Response**: `{ "tags": [{ "id": "...", "text": "Node.js", "category": "technology", "type": "specification", "contractorLabel": null, "aliases": ["NodeJS"] }] }` | List active vocabulary tags |
+| `POST` | `/api/tags` | System admin | **Body**: `{ text, category, type, contractorLabel?, aliases?, description? }` | Create controlled taxonomy tag |
+| `GET` | `/api/tags/:tagId` | System admin | **Response**: `{ "tag": { "id": "...", "text": "Node.js", "category": "technology", "type": "specification", "status": "active" } }` | Retrieve single tag details |
+| `PATCH` | `/api/tags/:tagId` | System admin | **Path**: `tagId`<br/>**Body**: `{ text?, category?, type?, contractorLabel?, aliases?, description?, status? }` | Update tag display text or metadata |
+| `DELETE` | `/api/tags/:tagId` | System admin | **Path**: `tagId` | Soft-deactivate tag (`status: "inactive"`) |
+| `GET` | `/api/tags/companies/:companyId` | Authenticated | **Response**: `{ "tagAssignments": [{ "tagId": "...", "text": "Node.js", "verificationLevel": "claimed", "confidence": 1.0 }] }` | List assigned tags for a company |
+| `PUT` | `/api/tags/companies/:companyId` | Authenticated | **Path**: `companyId`<br/>**Body**: `{ tagAssignments: [{ tagId, verificationLevel?, confidence?, evidence? }] }` | Replace company tag assignments |
+| `PUT` | `/api/tags/tors/:projectId` | PM / System admin | **Path**: `projectId`<br/>**Body**: `{ tagAssignments: [{ tagId, requirementLevel?, confidence?, evidence? }] }` | Replace TOR tag assignments |
+| `GET` | `/api/tags/tors/:projectId/suggestions` | PM / System admin | **Response**: `{ "suggestions": [{ "id": "...", "tagId": "...", "requirementLevel": "required", "evidence": "Clause 4.2...", "confidence": 0.95, "status": "pending" }] }` | List AI-extracted tag suggestions pending review |
+| `PUT` | `/api/tags/tors/:projectId/suggestions` | PM / System admin | **Path**: `projectId`<br/>**Body**: `{ suggestions: [{ tagId, requirementLevel, evidence, sourceDocumentUrl, sourcePage?, confidence? }] }` | Submit AI requirement suggestions |
+| `PATCH` | `/api/tags/tors/:projectId/suggestions/:suggestionId` | PM / System admin | **Path**: `projectId`, `suggestionId`<br/>**Body**: `{ status: "approved" \| "rejected", reviewNote? }` | Approve or reject an AI tag suggestion |
 
 ### AI Worker
-Requires the scoped `AI_REQUIREMENTS_TOKEN`.
+Requires the scoped `AI_REQUIREMENTS_TOKEN` bearer header.
 
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/ai/tors/:projectId/source` | AI worker | Numbered page text for requirement extraction |
-| `POST` | `/api/ai/tors/:projectId/requirements` | AI worker | Submit extracted requirements with citations |
+| Method | Endpoint | Access | Parameters / Return Example | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/ai/tors/:projectId/source` | AI worker | **Response**: `{ "projectId": "P670001", "documentHash": "abc123sha256...", "pages": [{ "page": 1, "text": "TOR contract text..." }] }` | Retrieve numbered page text snapshot for extraction |
+| `POST` | `/api/ai/tors/:projectId/requirements` | AI worker | **Path**: `projectId`<br/>**Body**: `{ snapshotId?, documentHash?, clauses: [...] }` | Ingest extracted requirement clauses and citations |
 
 ### Notifications
-Defined in `tor-backend/src/routes/notification.routes.mjs`. Preference routes also live in this router; check that file for the exact preference endpoints.
-
-| Method | Endpoint | Access | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/notifications` | Authenticated | List notifications |
-| `PATCH` | `/api/notifications/read-all` | Authenticated | Mark all as read |
-| `PATCH` | `/api/notifications/:id/read` | Authenticated | Mark one as read |
+| Method | Endpoint | Access | Parameters / Return Example | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/notifications` | Authenticated | **Response**: `{ "items": [{ "id": "...", "type": "new_match", "title": "New TOR Match", "message": "...", "read": false, "createdAt": "2026-11-14T..." }], "unreadCount": 3 }` | List user notifications |
+| `PATCH` | `/api/notifications/read-all` | Authenticated | None | Mark all notifications as read |
+| `PATCH` | `/api/notifications/:id/read` | Authenticated | **Path**: `id` | Mark a single notification as read |
+| `GET` | `/api/notifications/preferences` | Authenticated | **Response**: `{ "emailAlerts": true, "emailAvailable": true }` | Retrieve user email alert opt-in status |
+| `PATCH` | `/api/notifications/preferences` | Authenticated | **Body**: `{ emailAlerts: boolean }` | Update match email notification preference |
