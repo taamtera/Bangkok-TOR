@@ -142,40 +142,46 @@ flowchart TB
 ### 2. High-Level Dataflow Architecture
 
 ```mermaid
-flowchart LR
-    subgraph Flow1["Pipeline 1: RSS Ingestion"]
-        direction TB
-        eGP_1["e-GP RSS Feeds"] -->|"Raw items"| n8n_1["n8n Crawler"]
-        n8n_1 --> Filter_1{"Software/IT keyword match?"}
-        Filter_1 -- Yes --> DB_Tors_1[("tor_announcements<br/>+ thumbnails")]
-        Filter_1 -- No --> DB_Runs_1[("ingestion_runs<br/>(rejected counts)")]
+flowchart TB
+    subgraph P1["Pipeline 1: RSS Ingestion"]
+        direction LR
+        egp1["e-GP RSS feeds"] -->|"raw items"| n8n1["n8n crawler"]
+        n8n1 --> filter1{"Software/IT<br/>keyword match?"}
+        filter1 -- "Yes" --> tors1[("tor_announcements<br/>+ thumbnails")]
+        filter1 -- "No" --> runs1[("ingestion_runs<br/>(rejected counts)")]
     end
 
-    subgraph Flow2["Pipeline 2: Discovery & Document Proxy"]
-        direction TB
-        User_2["Web Browser"] -->|"1. View TOR"| Next_2["Next.js Frontend"]
-        Next_2 -->|"2. GET /api/tors"| API_2["Express API"]
-        API_2 -->|"3. Read"| DB_Tors_2[("tor_announcements")]
-        API_2 -->|"4. Fetch PDF"| eGP_2["e-GP host"]
-        API_2 -->|"5. Stream PDF"| User_2
+    subgraph P2["Pipeline 2: Discovery and Document Proxy"]
+        direction LR
+        browser2["Web browser"] -->|"1. view TOR"| fe2["Next.js frontend"]
+        fe2 -->|"2. GET /api/tors"| api2["Express API"]
+        api2 -->|"3. read"| tors2[("tor_announcements")]
+        api2 -->|"4. fetch PDF"| egp2["e-GP host"]
+        api2 -->|"5. stream PDF"| browser2
     end
 
-    subgraph Flow3["Pipeline 3: Deterministic Matching"]
-        direction TB
-        Comp_3["Company profile"] --> API_3["Express API"]
-        TOR_3["TOR requirements"] --> API_3
-        API_3 -->|"stdin JSON"| Py_3["Python engine (Policy 3)"]
-        Py_3 -->|"stdout JSON, score 0-100%"| API_3
-        API_3 -->|"Save"| DB_Matches_3[("company_matches")]
+    subgraph P3["Pipeline 3: Deterministic Matching"]
+        direction LR
+        comp3["Company profile"] --> api3["Express API"]
+        tor3["TOR requirements"] --> api3
+        api3 -->|"stdin JSON"| py3["Python engine<br/>(Policy 3)"]
+        py3 -->|"stdout JSON<br/>score 0-100%"| api3
+        api3 -->|"save"| matches3[("company_matches")]
     end
+
+    P1 ~~~ P2
+    P2 ~~~ P3
 ```
 
-#### Pipeline Descriptions
-1. **RSS Ingestion**: n8n polls e-GP RSS feeds, filters by software/IT title keywords, logs counts in `ingestion_runs`, and upserts matches into `tor_announcements` (keyed by string `projectId`) plus WebP previews in `thumbnails`.
-2. **Authentication & Profile**: Software houses authenticate against `users` (hashed passwords); sessions live in `sessions`. Company capabilities in `companies` link to controlled `tags` with evidence levels (`claimed`, `experienced`, `verified`).
-3. **Discovery & Document Proxy**: `/api/tors` serves metadata; `/api/thumbnail/:projectId` serves a thumbnail only when its `sourceUrl` matches the project's current `documentUrl`; `/api/tors/documents/:projectId` streams the remote PDF/HTML through the backend.
-4. **Deterministic Matching (Policy 3)**: Express runs `matching/engine.py` over stdin/stdout. Clause weights: `required` 3, `preferred` 1, `informational` 0. Evidence multipliers: `claimed` 0.5, `experienced` 0.75, `verified` 1.0. Results are stored in `company_matches`.
-5. **Grounded AI Evaluation**: Document pages are hashed (SHA-256) into `requirement_sources`; n8n asks Qwen for tags/requirements, stored as `suggested` until a reviewer approves.
+**Pipeline 1: RSS Ingestion.** n8n polls e-GP RSS feeds and filters by software/IT title keywords. Every run is logged in `ingestion_runs`. Matches are upserted into `tor_announcements` (keyed by string `projectId`), with WebP previews in `thumbnails`.
+
+**Pipeline 2: Discovery & Document Proxy.** `/api/tors` serves metadata. `/api/thumbnail/:projectId` serves a thumbnail only when its `sourceUrl` matches the project's current `documentUrl`. `/api/tors/documents/:projectId` streams the remote PDF/HTML through the backend.
+
+**Pipeline 3: Deterministic Matching (Policy 3).** Express runs `matching/engine.py` over stdin/stdout. Clause weights: `required` 3, `preferred` 1, `informational` 0. Evidence multipliers: `claimed` 0.5, `experienced` 0.75, `verified` 1.0. Results are stored in `company_matches`.
+
+#### Supporting flows (not diagrammed)
+- **Authentication & Profile**: Software houses authenticate against `users` (hashed passwords); sessions live in `sessions`. Company capabilities in `companies` link to controlled `tags` with evidence levels (`claimed`, `experienced`, `verified`).
+- **Grounded AI Evaluation**: Document pages are hashed (SHA-256) into `requirement_sources`. n8n asks Qwen for tags/requirements, stored as `suggested` until a reviewer approves.
 
 ---
 
