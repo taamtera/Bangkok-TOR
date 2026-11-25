@@ -29,11 +29,11 @@ The backend loads its own `tor-backend/.env` automatically. Shell or deployment 
 - Safe 404 and server-error responses
 - Graceful server and database shutdown
 - Reusable repositories for users, secure tokens, sessions, audit logs, companies, and TOR discovery
-- Canonical tag catalog (`text`, `category`, `type`), TOR annotations regardless of review stage, and evidence-bearing company assignments
+- Canonical tag catalog (`text`, `category`, `type`), TOR annotations with automatic matching eligibility checks, and evidence-bearing company assignments
 
 ## TOR API
 
-The frontend reads projects through the Express API. RSS stage dates use `YYYY-MM-DD`; contract dates preserve the source API?s original Thai strings.
+The frontend reads projects through the Express API. RSS stage dates use `YYYY-MM-DD`; contract dates preserve the source API’s original Thai strings.
 
 - `GET /api/tors`: list TOR announcements. Supports `search`, `status`, `category`, `tagIds`, `sourceId`, `organizationId`, `minBudget`, `maxBudget`, `deadlineAfter`, `page`, and `limit` query parameters. `tagIds` accepts either a comma-separated list or repeated query parameters.
 - `GET /api/tors/:projectId`: read one project by its exact string project ID.
@@ -103,7 +103,7 @@ Company updates are restricted to the authenticated user's own company unless th
 
 Human catalog maintenance routes require an authenticated `system_admin`. The separate scoped AI worker routes automatically validate PDF quotations and apply supported tags. Legacy pending suggestions continue to require review and do not affect scoring.
 
-Company users (`company_admin` and `company_member`) access matches without a system-administrator role. The saved company profile supplies technologies and qualifications automatically; the matching page does not ask users to re-enter them or approve tags. Profile claims are not independently verified. Matching uses source-validated AI extractions, reviewed requirement assignments, or the explicitly enabled existing demo requirements. Announcement title mentions alone do not become contract requirements. The backend prepares PDF text and accepts evidence-validated AI submissions; the teammate still needs to implement AI interpretation. Privileged maintenance APIs remain available.
+Company users (`company_admin` and `company_member`) access matches without a system-administrator role. The saved company profile supplies technologies and qualifications automatically; the matching page does not ask users to re-enter them or approve tags. Profile claims are not independently verified. Matching uses source-validated AI extractions, reviewed requirement assignments, or the explicitly enabled existing demo requirements. Announcement title mentions alone do not become contract requirements. The backend prepares PDF text and accepts evidence-validated AI submissions. The repository also includes a separate company-evaluation workflow; see [company evaluation](docs/company-tor-evaluation.md) for its configuration and verification boundary. Privileged maintenance APIs remain available.
 
 ## AI requirement integration
 
@@ -124,8 +124,8 @@ These routes require a scoped `AI_REQUIREMENTS_TOKEN` bearer key, not a human ad
   GET and PUT responses resolve `contractorLabel`, `text`, `category`, `type`, and
   `status` from the linked catalog records; clients save only tag IDs, never
   copies of those labels. Catalog label edits appear on the next profile read.
-  These display links do not create or replace evidence-bearing `tagAssignments`.
-- `PUT /api/companies/me`: update the linked company's display name, size, district, primary contact email, technologies, and qualification names. Qualification names are stored as objects in `companies.qualifications`; unchanged entries retain existing evidence metadata. Exact profile entries are linked as self-reported `claimed` capabilities and are never marked verified.
+  Profile saves synchronize selected services as claimed `tagAssignments` while preserving independent experience and verification evidence.
+- `PUT /api/companies/me`: update the linked company's display name, description, size, district, primary contact email, technologies, qualification names, certifications, and selected service tags. Qualification names are stored as objects in `companies.qualifications`; unchanged entries retain existing evidence metadata. Exact profile entries are linked as self-reported `claimed` capabilities and are never marked verified.
 - `POST /api/companies/me/matching-tags/sync`: link the current profile's exact technology and qualification entries to active tags as self-reported `claimed` capabilities. The operation is idempotent and does not create TOR requirements.
 
 All endpoints require a company account and derive the company ID from the authenticated session. Profile saves and explicit syncs link company profile values; the profile remains the only company-facing place to edit those values.
@@ -140,15 +140,13 @@ See [Matching and AI handoff](docs/matching-ai-handoff.md) for the demo safeguar
 
 ## Authentication Ownership
 
-The authentication teammate should add controllers and routes under `src/routes` and use the shared database repositories. Authentication logic must not be placed in the Next.js browser code.
-
-Planned route prefix: `/api/auth`.
+Authentication is implemented under `/api/auth`: registration, login, refresh, logout, logout-all, forgot-password, reset-password, session, and current-user endpoints. Registration signs users in immediately; signup verification email is not implemented.
 
 The exact registration fields, statuses, endpoint names, token policy, and team responsibilities are defined in `docs/authentication-contract.md`.
 
 ## Docker
 
-The backend image installs production dependencies only, runs as a non-root user, and contains no `.env` file or database credentials. Start it through the repository-level `docker-compose.yml` so health checks and the crawler worker are configured together.
+The backend image installs production dependencies only, runs as a non-root user, and contains no `.env` file or database credentials. Start it through the repository-level `docker-compose.yml` so the API and frontend health checks are configured together. The hosted crawler is external.
 
 ## Database compatibility checks
 
@@ -165,5 +163,10 @@ email verification routes are not part of the current API.
 
 The retired policy-2 JavaScript engine, its compatibility facade/text heuristic,
 and test-only catalog/matching migration scripts have been removed. Policy-3 Python
-matching is the only scoring implementation. Existing TOR tag review metadata is
-preserved for inspection but does not gate display, tag filtering or matching.
+matching is the only scoring implementation. TOR tag metadata is preserved. For `reviewStatus: suggested` AI assignments, automatic use requires completed processing, passed AI review, valid confidence, and assignment/catalog eligibility checks. Assignments already marked `approved` or `validated` use the assignment/catalog checks without requiring that AI processing metadata. Rejected and unreviewed suggestions do not contribute to matching.
+
+## Dashboard and alerts
+
+`GET /api/dashboard/stats` returns public aggregate database statistics. These are dataset summaries, not company-specific success probabilities.
+
+See [notifications](docs/notifications.md) for inbox/preferences endpoints and [automatic alerts](docs/automatic-match-alerts.md) for database polling and SMTP delivery. The backend must stay running. Company evaluation uses `GET`/`POST /api/tors/:projectId/evaluation`; it is separate from `/api/recommendations`.

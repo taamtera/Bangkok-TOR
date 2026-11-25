@@ -22,17 +22,11 @@ company member who opted into both `in_app` and `new_match` receives their own
 alert. Zero, unassessed and AI recommendation results do not produce these alerts.
 The percentage describes requirement coverage, not bid eligibility or AI suitability.
 
-Repeated refreshes, concurrent requests, profile edits and TOR versions do not
-duplicate the initial alert or reset its read state. Notifications already delivered
-remain historical; opening a TOR loads its current details. Recalculate matches to
-produce alerts: profile updates and requirement refreshes already call this path.
-Direct crawler/database writes alone do not run the matcher. A crawler or future AI
-worker must invoke the existing matching refresh flow after its results are saved.
-There is no background matching scheduler or automatic backfill of old matches.
+Repeated calculations for the same user, company, TOR and version do not duplicate alerts or reset their read state. A new TOR version can generate a distinct event. Historical notifications remain stored; opening a TOR loads current details.
 
-This first version implements `new_match` in-app alerts. Email notifications,
-deadline reminders, TOR-change alerts and a preference editor are separate work;
-the existing stored preferences are respected. No Gmail credentials are required.
+While running with its alert worker enabled, the backend checks tracked TOR fields and tag-catalog changes after each scan, with a default 60-second interval. Its first scan establishes a baseline without historical backfill. Profile saves and requirement refreshes also run matching. Recognized awarded and cancelled stages are excluded from new alerts. See [automatic matching and email](automatic-match-alerts.md) for queue behavior and configuration.
+
+Email is optional and requires configured SMTP, `MATCH_ALERT_EMAIL_ENABLED=true`, and explicit user opt-in. The preference panel uses `GET /api/notifications/preferences` and `PATCH /api/notifications/preferences` with `{ "emailAlerts": true }` or false. Recipient identity comes from the authenticated account. Deadline reminders and detailed TOR-change comparison alerts are not implemented by this feature.
 
 Tests: `npm test` includes event-policy tests. To test persistence and ownership
 against Atlas, set `RUN_NOTIFICATION_INTEGRATION=true` and run
