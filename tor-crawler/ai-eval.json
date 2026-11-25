@@ -1,0 +1,1446 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "={{ $json.documentUrl }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "4ddf40a2-edd7-4121-83a0-a9f1874c415b",
+      "name": "Download TOR Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        32,
+        912
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out=[];\nfor(let i=0;i<$input.all().length;i++){\n const item=$input.all()[i];\n const job=$('Download TOR Document').itemMatching(i).json;\n // HTTP Request may replace input JSON. Prefer linked upstream job when available.\n let original={};\n try{original=$('Prepare PDF Test').itemMatching(i).json;}catch(e){original=job;}\n if(!item.binary?.data){out.push({json:{...original,sourceFormat:'error',fetchError:item.json?.error?.message||'No binary data'},pairedItem:{item:i}});continue;}\n const b=await this.helpers.getBinaryDataBuffer(i,'data');\n const sig=b.subarray(0,4).toString('hex');\n const head=b.subarray(0,8192).toString('latin1').trimStart();\n const filename=String(item.binary.data.fileName||'').toLowerCase();\n const mimeType=String(item.binary.data.mimeType||'').toLowerCase();\n let fmt='unknown';\n if(['504b0304','504b0506','504b0708'].includes(sig))fmt='zip';\n else if(head.startsWith('%PDF-'))fmt='pdf';\n else if(/<!doctype\\s+html|<html\\b|<head\\b|<body\\b/i.test(head))fmt='html';\n else if(sig.startsWith('ffd8ff')||sig==='89504e47'||sig.startsWith('47494638'))fmt='image';\n else if(/\\.html?$/.test(filename)||mimeType.includes('html'))fmt='html';\n else if(filename.endsWith('.pdf')||mimeType.includes('pdf'))fmt='pdf';\n else if(filename.endsWith('.zip')||mimeType.includes('zip'))fmt='zip';\n const charset=head.match(/charset\\s*=\\s*[\"']?\\s*([\\w-]+)/i)?.[1]||null;\n out.push({json:{...original,sourceFormat:fmt,filename,mimeType,charset,sizeBytes:b.length,signature:sig,fetchError:null},binary:item.binary,pairedItem:{item:i}});\n}\nreturn out;"
+      },
+      "id": "bc7e2fb8-1bdc-4a58-8008-e7070cf1fe32",
+      "name": "Detect Document Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.sourceFormat }}",
+                    "rightValue": "html",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.sourceFormat }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.sourceFormat }}",
+                    "rightValue": "zip",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "dd48efb3-89d7-48ab-b93b-6f430747601d",
+      "name": "Route Document Format",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        464,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const out=[];\nfor(let i=0;i<$input.all().length;i++){\n const item=$input.all()[i];const b=await this.helpers.getBinaryDataBuffer(i,'data');\n const h=b.subarray(0,8192).toString('latin1');\n const declared=h.match(/charset\\s*=\\s*[\"']?\\s*([\\w-]+)/i)?.[1]||item.json.charset||'';\n const encoding=/tis-?620|windows-?874|cp874/i.test(declared)?'windows-874':'utf-8';\n const html=new TextDecoder(encoding).decode(b);\n out.push({json:{...item.json,html,sourceEncoding:encoding},pairedItem:{item:i}});\n}\nreturn out;"
+      },
+      "id": "3967db55-407b-44ce-83c3-6ed46e2d945b",
+      "name": "Decode Thai HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "dataPropertyName": "html",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "text",
+              "cssSelector": "form[name=\"form1\"] center",
+              "skipSelectors": "script,style,noscript,svg,iframe,input,button,select,option"
+            },
+            {
+              "key": "fallbackText",
+              "cssSelector": "body",
+              "skipSelectors": "script,style,noscript,svg,iframe,input,button,select,option"
+            }
+          ]
+        },
+        "options": {
+          "trimValues": true,
+          "cleanUpText": true
+        }
+      },
+      "id": "04a5dfac-fcfa-46e0-8d72-49382e231aa9",
+      "name": "Extract HTML Text",
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        1344,
+        496
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item,i)=>{\n const job=$('Decode Thai HTML').itemMatching(i).json;\n let text=String(item.json.text||'').trim();\n if(!text)text=String(item.json.fallbackText||'').trim();\n text=text.replace(/\\u00a0/g,' ').replace(/[\\u200B-\\u200D\\uFEFF]/g,'').replace(/[ \\t]+/g,' ').replace(/\\n{3,}/g,'\\n\\n').trim();\n return {json:{projectId:job.projectId,title:job.title,documentUrl:job.documentUrl,status:job.status,sourceFormat:'html',extractionMethod:'html_text',sourceEncoding:job.sourceEncoding,textLength:text.length,thaiCharacters:(text.match(/[ก-๙]/g)||[]).length,extractionStatus:item.json.error?'error':text.length>100?'success':text.length?'low_text':'no_text',error:item.json.error?.message||null,extractedText:text}};\n});"
+      },
+      "id": "c7eebce7-47c0-4e5f-bfdb-dba414372139",
+      "name": "HTML Text Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "id": "062c963f-1db2-4b8e-ab73-b510b48beaa0",
+      "name": "Extract PDF Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        688
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item,i)=>{\n const job=$('Detect Document Format').itemMatching(i).json;\n const text=String(item.json.text||'').trim();\n return {json:{projectId:job.projectId,title:job.title,documentUrl:job.documentUrl,status:job.status,sourceFormat:'pdf',extractionMethod:'pdf_text',pages:item.json.numpages??null,textLength:text.length,thaiCharacters:(text.match(/[ก-๙]/g)||[]).length,extractionStatus:item.json.error?'error':text.length>100?'success':text.length?'low_text':'needs_ocr',error:item.json.error?.message||null,extractedText:text}};\n});"
+      },
+      "id": "bc78d4a8-9a42-4ce3-98ef-276e28827cbc",
+      "name": "PDF Text Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item,i)=>({json:item.json,binary:{...item.binary,data:{...item.binary.data,fileName:'document.zip',mimeType:'application/zip',fileExtension:'zip'}},pairedItem:{item:i}}));"
+      },
+      "id": "dcba129a-fa7b-4dd8-8a76-882494b4de3d",
+      "name": "Prepare ZIP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        880
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "1016c518-74fd-46f0-b517-521781dcb7dd",
+      "name": "Decompress ZIP",
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        880
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out=[];\nfor(let i=0;i<$input.all().length;i++){\n const item=$input.all()[i];const job=$('Prepare ZIP').itemMatching(i).json;\n for(const [key,file] of Object.entries(item.binary||{})){\n  const filename=String(file.fileName||key);\n  if(!/\\.pdf$/i.test(filename)&&file.mimeType!=='application/pdf')continue;\n  out.push({json:{...job,attachmentFilename:filename},binary:{data:file},pairedItem:{item:i}});\n }\n}\nreturn out;"
+      },
+      "id": "5342086c-8c47-4746-b13a-73ad56f40877",
+      "name": "Split ZIP PDFs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "id": "eb060c13-1152-48d0-8176-264a808df03f",
+      "name": "Extract ZIP PDF Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        880
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item,i)=>{\n const job=$('Split ZIP PDFs').itemMatching(i).json;\n const text=String(item.json.text||'').trim();\n return {json:{projectId:job.projectId,title:job.title,documentUrl:job.documentUrl,status:job.status,sourceFormat:'zip',attachmentFilename:job.attachmentFilename,extractionMethod:'zip_pdf_text',pages:item.json.numpages??null,textLength:text.length,thaiCharacters:(text.match(/[ก-๙]/g)||[]).length,extractionStatus:item.json.error?'error':text.length>100?'success':text.length?'low_text':'needs_ocr',error:item.json.error?.message||null,extractedText:text}};\n});"
+      },
+      "id": "8001eb59-a6bc-4d26-be98-58ef80d9d917",
+      "name": "ZIP PDF Text Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item=>({json:{projectId:item.json.projectId,documentUrl:item.json.documentUrl,sourceFormat:item.json.sourceFormat,extractionStatus:'unsupported',error:item.json.fetchError||'Unsupported source format',extractedText:''}}));"
+      },
+      "id": "0f425ba9-90b7-42ea-8e89-81c8f046ebe1",
+      "name": "Unsupported Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().filter(x => x.json.projectId && x.json.documentUrl).map((x,i)=>({json:{projectId:String(x.json.projectId),title:x.json.title||'',documentUrl:x.json.documentUrl,status:x.json.status||'',publishedAt:x.json.publishedAt||null},pairedItem:{item:i}}));"
+      },
+      "id": "55651384-c8af-489e-8999-2597cba32470",
+      "name": "Prepare PDF Test",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "tor_announcements",
+        "updateKey": "projectId",
+        "fields": "={{ $json._updateFields }}",
+        "options": {}
+      },
+      "id": "a4f8fdfe-07e4-41d8-a35e-064316d5fb00",
+      "name": "Mark Missing Text",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -144,
+        1840
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(x=>({json:{projectId:x.json.projectId,aiProcessing:{status:'needs_ocr_or_source_review',version:1,model:'qwen3.5:4b',processedAt:new Date().toISOString()},_updateFields:'aiProcessing'}}));"
+      },
+      "id": "3646c643-346e-4c7f-bf3c-cd71fb2ef1df",
+      "name": "No Text Processing Marker",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        1840
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=new Map();\nfor(const it of $input.all()) {\n const d=it.json; const id=String(d.projectId||'').trim(); if(!id)continue;\n if(!m.has(id))m.set(id,{projectId:id,title:d.title||'',status:d.status||'',documentUrl:d.documentUrl||'',publishedAt:d.publishedAt||null,documents:[]});\n const p=m.get(id);\n p.documents.push({filename:d.attachmentFilename||d.filename||null,sourceFormat:d.sourceFormat||'unknown',extractionStatus:d.extractionStatus||'unknown',pages:d.pages??null,extractedText:String(d.extractedText||'')});\n}\nreturn [...m.values()].map(p=>({json:p}));"
+      },
+      "id": "fce91ace-982a-4868-a412-07d53c5a8dae",
+      "name": "Group Documents by Project",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "collection": "tor_announcements",
+        "options": {
+          "limit": 1,
+          "sort": "{\"firstSeenAt\":1,\"_id\":1}"
+        },
+        "query": "{\"projectId\":{\"$type\":\"string\",\"$ne\":\"\"},\"documentUrl\":{\"$type\":\"string\",\"$ne\":\"\"},\"$or\":[{\"aiProcessing.version\":{\"$ne\":3}},{\"aiProcessing.status\":\"pending\"}],\"aiProcessing.status\":{\"$nin\":[\"completed\",\"processing\",\"failed\",\"no_extractable_text\",\"needs_ocr_or_source_review\"]}}"
+      },
+      "id": "0515f399-862a-4949-aaf1-64ec5bf4cc73",
+      "name": "Find AI Unprocessed TOR",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        1152
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.77.43.106:11434/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'qwen3.5:9bu', stream: false, think: false, options: { num_ctx: 16000, num_predict: 3, temperature: 0 }, messages: [{ role: 'user', content: \"Reply exactly 'OK'\" }] }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "550c76bd-b7b3-4a68-9a8c-e47be69a2a44",
+      "name": "Wake Qwen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1696,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\n\nif (\n  r.message?.content?.trim() !== 'OK' ||\n  r.done_reason !== 'stop'\n) {\n  throw new Error(\n    'Qwen not ready: ' + JSON.stringify(r)\n  );\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1904,
+        1168
+      ],
+      "id": "54e95989-90e3-4ca6-883e-b2b20a1c8098",
+      "name": "Check Qwen Status"
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2192,
+        1152
+      ],
+      "id": "ab1c1f66-d9be-4429-a6b0-809267b9647e",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "collection": "tags",
+        "options": {},
+        "query": "={\"status\":\"active\"}"
+      },
+      "id": "65513de6-1890-430d-851f-51f57682b22c",
+      "name": "Load Active Tag Catalog",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -144,
+        1616
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.documents || []).some(doc => String(doc.extractedText || '').trim().length > 0) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "51f1423f-1f39-427e-9d70-0a1a24212a5e"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b7d03887-b2ec-4c4f-aa50-e255db9e9866",
+      "name": "Has Extracted Text",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -576,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "tor_announcements",
+        "updateKey": "projectId",
+        "fields": "documents",
+        "options": {}
+      },
+      "id": "4d0f3fb3-2c01-4ea3-8a86-aeb2e3522cd9",
+      "name": "Save Extracted Text",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -384,
+        1616
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst catalogMap = new Map();\n\nfor (const item of $input.all()) {\n  const t = item.json || {};\n\n  if (t.status !== 'active' || !t._id) continue;\n\n  const id = String(t._id?.$oid || t._id);\n\n  if (!/^[a-f0-9]{24}$/i.test(id)) continue;\n\n  const text = String(t.text || '').trim();\n\n  if (!text || !t.category || !t.type) continue;\n\n  catalogMap.set(id, {\n    id,\n    text,\n    contractorLabel: String(t.contractorLabel || '').trim(),\n    category: t.category,\n    type: t.type,\n    aliases: Array.isArray(t.aliases) ? t.aliases : []\n  });\n}\n\nconst catalog = [...catalogMap.values()];\nconst totalCatalogTags = catalog.length;\n\nconst projects = $('Group Documents by Project')\n  .all()\n  .map(item => item.json);\n\nconst normalizeDigits = value =>\n  String(value || '').replace(/[๐-๙]/g, c =>\n    String(c.charCodeAt(0) - 0x0E50)\n  );\n\nconst aiSystemPrompt = `\nFACT EXTRACTION:\n- Use only facts supported by DOCUMENT.\n- Unknown values must be null; missing arrays must be [].\n- Budget means project budget, not bidder financial thresholds.\n- Never treat announcement dates as contract dates.\n- Use YYYY-MM-DD only for explicit contract dates.\n- For shared procurement plans, extract only the matching project.\n\nEVIDENCE:\n- Every evidence must be one short, continuous, verbatim\n  substring of DOCUMENT, preserving exact characters.\n- Never paraphrase, combine quotations or use ellipses.\n- Omit any claim whose evidence cannot be found exactly.\n\nTAGS:\n- Reuse matching catalog tags using their exact tagId.\n- Create new tags only for distinct, reusable concepts\n  not already covered by the catalog.\n- Prefer precision over quantity.\n- Avoid duplicate, synonymous or overlapping tags.\n- Do not create tags for quantities, prices, dates,\n  brands, models or minor technical variants.\n- specification = goods, services or deliverables.\n- contractor_requirement = bidder qualifications\n  or eligibility, such as financial capacity,\n  registration, experience or required certifications.\n- Do not confuse product requirements with bidder qualifications.\n- Generic delivery, warranty, payment, penalty and\n  evaluation conditions belong in detailed requirements.\n- Incidental installation or warranty does not automatically\n  establish a separate service deliverable.\n- Never invent catalog IDs or unsupported qualifications.\n\nCONTRACTOR LABELS:\n- Every new tag requires text and contractorLabel.\n- text describes the project concept.\n- contractorLabel describes the corresponding supplier,\n  provider, contractor capability or bidder qualification.\n- Both labels represent one tag, not separate concepts.\n- Do not invent licenses, certifications or authorizations.\n- Reused tags need only the existing tagId.\n\nDETAILED REQUIREMENTS:\n- Maximum 8 independently checkable requirements.\n- Preserve exact quantities, thresholds and variants.\n- Prioritize important technical and bidder requirements.\n- Categories: technical_specification, product_condition,\n  bidder_qualification, delivery_condition, other.\n- appliesTo = item name or null.\n- requirementLevel = required, preferred or informational.\n\nReturn exactly the JSON structure specified below.\nNo markdown, explanations or extra fields.\n{\n  \"departmentName\": null,\n  \"procurementMethod\": null,\n  \"budgetAmount\": null,\n  \"projectStartAt\": null,\n  \"projectEndAt\": null,\n  \"aiExtractedRequirements\": [\n    {\n      \"text\": \"condition\",\n      \"category\": \"technical_specification\",\n      \"appliesTo\": null,\n      \"requirementLevel\": \"required\",\n      \"evidence\": \"exact quote\"\n    }\n  ],\n  \"tagSuggestions\": [\n    {\n      \"action\": \"reuse\",\n      \"tagId\": \"existing catalog ID\",\n      \"requirementLevel\": \"required\",\n      \"confidence\": 0.9,\n      \"evidence\": \"exact quote\"\n    },\n    {\n      \"action\": \"create\",\n      \"text\": \"Broad concept\",\n      \"contractorLabel\": \"Corresponding contractor capability or qualification\",\n      \"category\": \"capability\",\n      \"type\": \"specification\",\n      \"requirementLevel\": \"required\",\n      \"confidence\": 0.9,\n      \"evidence\": \"exact quote\"\n    }\n  ]\n}\n\nUse YYYY-MM-DD only for explicit contract dates.\nReturn JSON only. No markdown or explanation.\n`.trim();\n\nconst output = [];\n\nfor (const p of projects) {\n  const projectId = String(p.projectId || '').trim();\n  if (!projectId) continue;\n\n  const documentTexts = [];\n  const documentIssues = [];\n\n  for (const doc of p.documents || []) {\n    let text = String(doc.extractedText || '').trim();\n    if (!text) continue;\n\n    // Match the correct row in shared procurement plans.\n    if (/^P\\d/i.test(projectId)) {\n      const index = normalizeDigits(text)\n        .indexOf(normalizeDigits(projectId));\n\n      if (index < 0) {\n        documentIssues.push(\n          'Project ID missing in ' +\n          (doc.filename || 'document')\n        );\n        continue;\n      }\n\n      text =\n        text.slice(0, Math.min(400, text.length)) +\n        '\\n[PROJECT ROW]\\n' +\n        text.slice(\n          Math.max(0, index - 100),\n          index + 1200\n        );\n    }\n\n    documentTexts.push(\n      '### ' + (doc.filename || 'Document') +\n      '\\n' + text\n    );\n  }\n\n  const raw = documentTexts.join('\\n\\n');\n  if (!raw.trim()) continue;\n\n  const sourceText = raw.length > 16000\n    ? raw.slice(0, 11500) +\n      '\\n[DOCUMENT MIDDLE OMITTED]\\n' +\n      raw.slice(-3500)\n    : raw;\n\n  const aiPrompt = [\n    'PROJECT ID: ' + projectId,\n    'TITLE: ' + String(p.title || ''),\n    'STATUS: ' + String(p.status || ''),\n    '',\n    'EXISTING TAGS:',\n    JSON.stringify(catalog),\n    '',\n    'DOCUMENT:',\n    sourceText\n  ].join('\\n');\n\n  output.push({\n    json: {\n      projectId,\n      title: p.title,\n      status: p.status,\n      documentUrl: p.documentUrl,\n      aiPrompt,\n      originalAiPrompt: aiPrompt,\n      aiSystemPrompt,\n      tagCatalog: catalog,\n      totalCatalogTags,\n      sourceText,\n      documentIssues,\n      attempt: 1,\n      lastValidationErrors: [],\n      model: 'qwen3.5:9bu'\n    }\n  });\n}\n\nreturn output;"
+      },
+      "id": "361e394a-4710-4325-b11b-28813a3fd134",
+      "name": "Prepare AI Prompt With Catalog",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "aggregate",
+        "collection": "tags",
+        "query": "={{ $(\"Prepare Canonical Tag Upsert\").first().json.tagUpsertPipeline }}"
+      },
+      "id": "9134f5ca-8dcb-4b13-aa0f-621534d97875",
+      "name": "Upsert Canonical Tags",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        2544,
+        1456
+      ],
+      "settings": {
+        "alwaysOutputData": true
+      },
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "collection": "tags",
+        "options": {},
+        "query": "{\"status\":\"active\"}"
+      },
+      "id": "e1f6f311-e814-4d9a-91c1-ed4c0346963f",
+      "name": "Reload Active Canonical Tags",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        2800,
+        1456
+      ],
+      "alwaysOutputData": true,
+      "settings": {
+        "alwaysOutputData": true
+      },
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// IMPORTANT: This Code node uses the approved data from its ancestor\n// because the preceding MongoDB Find returns catalog documents.\nconst d = $('Prepare Canonical Tag Upsert').first().json;\nconst ai=d.validatedAi;\nif(!d.reviewPassed || !d.validationPassed || !ai) throw Error('Review approval missing');\nconst idOf=x=>String(x?.$oid||x||'');\nconst normalize=x=>String(x||'').normalize('NFKC').trim().toLowerCase().replace(/\\s+/g,' ');\nconst catalog=$input.all().map(x=>x.json).filter(x=>x._id);\nconst suggestions=ai.tagSuggestions||[];\nconst assigned=[],ids=new Set();\nfor(const s of suggestions){\n let tag;\n if(s.action==='reuse') tag=catalog.find(t=>idOf(t._id)===idOf(s.tagId));\n else tag=catalog.find(t=>t.category===s.category && normalize(t.text)===normalize(s.text));\n if(!tag) throw Error('Cannot resolve tag: '+(s.text||s.tagId));\n const id=idOf(tag._id);\n if(!/^[a-f0-9]{24}$/i.test(id)) throw Error('Invalid BSON tag id: '+id);\n if(ids.has(id)) throw Error('Two proposals resolve to same tag '+id);\n ids.add(id);\n assigned.push({tagId:id,requirementLevel:s.requirementLevel,evidence:s.evidence,source:'ai',confidence:Number(s.confidence),reviewStatus:'suggested'});\n}\n// Retain manual/crawler and previously approved or rejected assignments.\n// Replace only unreviewed AI suggestions, without duplicating kept IDs.\nconst kept={$filter:{input:{$ifNull:['$tagAssignments',[]]},as:'a',cond:{$or:[{$ne:['$$a.source','ai']},{$in:['$$a.reviewStatus',['approved','rejected']]}]}}};\nconst proposed={$map:{input:{$literal:assigned},as:'a',in:{tagId:{$toObjectId:'$$a.tagId'},requirementLevel:'$$a.requirementLevel',evidence:'$$a.evidence',source:'$$a.source',confidence:'$$a.confidence',reviewStatus:'$$a.reviewStatus'}}};\nconst nonduplicates={$filter:{input:proposed,as:'p',cond:{$not:[{$in:[{$toString:'$$p.tagId'},{$map:{input:kept,as:'k',in:{$toString:'$$k.tagId'}}}]}]}}};\nconst values={\n tagAssignments:{$concatArrays:[kept,nonduplicates]},\n aiTagSuggestions:{$literal:suggestions.map(s=>({...s,source:'ai',reviewStatus:'suggested'}))},\n aiExtractedRequirements:{$literal:ai.aiExtractedRequirements||[]},\n aiProcessing:{$literal:{status:'completed',version:3,model:d.model||'qwen3.5:4b',processedAt:new Date().toISOString(),attempts:Number(d.attempt||1),tagReviewStatus:'approved',catalogSizeAtEvaluation:Number(d.totalCatalogTags||0)}}\n};\nfor(const k of ['departmentName','procurementMethod']) if(typeof ai[k]==='string' && ai[k].trim()) values[k]={$literal:ai[k].trim()};\nif(typeof ai.budgetAmount==='number' && Number.isFinite(ai.budgetAmount) && ai.budgetAmount>=0) values.budget={$mergeObjects:[{$ifNull:['$budget',{}]},{maxAmount:ai.budgetAmount}]};\nfor(const k of ['projectStartAt','projectEndAt']) if(typeof ai[k]==='string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(ai[k])) values[k]={$literal:ai[k]};\nconst pipeline=[{$match:{projectId:String(d.projectId)}},{$limit:1},{$set:values},{$merge:{into:'tor_announcements',on:'_id',whenMatched:'merge',whenNotMatched:'discard'}}];\nreturn [{json:{projectId:String(d.projectId),resolvedTagIds:assigned.map(x=>x.tagId),torWritePipeline:JSON.stringify(pipeline),expectedTagCount:assigned.length}}];"
+      },
+      "id": "8b67f5cd-3cf6-4249-8a48-8927c0524142",
+      "name": "Prepare BSON Tag Assignments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3072,
+        1456
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "aggregate",
+        "collection": "tor_announcements",
+        "query": "={{ $(\"Prepare BSON Tag Assignments\").first().json.torWritePipeline }}"
+      },
+      "id": "ad38f0b6-0bf6-4fe8-a3d2-f5d8b8537ed9",
+      "name": "Save TOR With Linked Tags",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        3328,
+        1456
+      ],
+      "settings": {
+        "alwaysOutputData": true
+      },
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "collection": "tor_announcements",
+        "options": {
+          "limit": 1
+        },
+        "query": "={{ JSON.stringify({projectId: $(\"Prepare BSON Tag Assignments\").first().json.projectId}) }}"
+      },
+      "id": "1094b338-eec1-4fe6-8777-27f048fde07c",
+      "name": "Reload Saved TOR",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        3584,
+        1456
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const expected=$('Prepare BSON Tag Assignments').first().json;\nconst tor=$input.first()?.json;\nif(!tor || tor.projectId!==expected.projectId) throw Error('TOR missing after write');\nif(tor.aiProcessing?.status!=='completed'||tor.aiProcessing?.version!==3) throw Error('Processing status/version not saved');\nconst idOf=x=>String(x?.$oid||x||'');\nconst ids=(tor.tagAssignments||[]).map(a=>idOf(a.tagId));\nfor(const id of expected.resolvedTagIds) if(!ids.includes(id)) throw Error('Missing tag link '+id);\nreturn [{json:{projectId:tor.projectId,success:true,aiProcessing:tor.aiProcessing,linkedTagIds:expected.resolvedTagIds,assignmentCount:(tor.tagAssignments||[]).length}}];"
+      },
+      "id": "3e108410-1d86-4c71-8ad3-722f06b5b6c2",
+      "name": "Verify Linked Tag IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        1456
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.77.43.106:11434/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'qwen3.5:9bu', stream: false, think: false, format: 'json', options: { num_ctx: 16000, temperature: 0, num_predict: 5000 }, messages: [{ role: 'user', content: $json.reviewPrompt }] }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "adc377cd-35f9-46b3-8de3-23ca58b88753",
+      "name": "Qwen Tag Reviewer HTTP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1648,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.77.43.106:11434/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'qwen3.5:9bu', stream: false, think: true, format: 'json', options: { num_ctx: 16000, temperature: 0.4, num_predict: 30000 }, messages: [{ role: 'system', content: $json.aiSystemPrompt || 'Extract factual Thai procurement information and broad reusable tags. Use the provided active tag catalog. Return JSON only.' }, { role: 'user', content: $json.requestPrompt }] }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 1000000
+        }
+      },
+      "id": "36df8a78-634b-4d8d-bdd6-10d4fa3b840f",
+      "name": "Qwen 3.5 4B HTTP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        496,
+        1616
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn $input.all().map(item => {\n  const d = item.json;\n\n  const original = String(\n    d.originalAiPrompt || d.aiPrompt || ''\n  ).trim();\n\n  if (!d.projectId || !original) {\n    throw new Error('projectId and aiPrompt are required');\n  }\n\n  const attempt = Number(d.attempt || 1);\n\n  const errors = Array.isArray(d.lastValidationErrors)\n    ? d.lastValidationErrors.map(String).filter(Boolean)\n    : [];\n\n  const previousAi =\n    d.previousValidatedAi || d.validatedAi || null;\n\n  const isRetry = attempt > 1 && errors.length > 0;\n\n  const tagOnlyCorrection =\n    isRetry &&\n    previousAi !== null &&\n    errors.every(e =>\n      /tagSuggestions\\[\\d+\\]/i.test(e)\n    );\n\n  let correction = '';\n\n  if (isRetry) {\n    correction =\n      '\\n\\nPREVIOUS ATTEMPT FAILED.\\n' +\n      'FIX THESE ERRORS:\\n- ' +\n      errors.slice(0, 10).join('\\n- ');\n  }\n\n  if (tagOnlyCorrection) {\n    correction +=\n      '\\n\\nPREVIOUS VALIDATED EXTRACTION:\\n' +\n      JSON.stringify(previousAi) +\n      '\\n\\nCorrect ONLY tagSuggestions.' +\n      '\\nPreserve all other extraction fields exactly.' +\n      '\\nFollow the reviewer recommendations.' +\n      '\\nReturn the complete corrected JSON object.';\n  } else if (isRetry) {\n    correction +=\n      '\\n\\nReturn the complete corrected JSON object.' +\n      '\\nUse source-supported facts and exact evidence.' +\n      '\\nFor reuse, select tagId only from the existing catalog.' +\n      '\\nNever invent tag IDs.';\n  }\n\n  return {\n    json: {\n      ...d,\n\n      attempt,\n      originalAiPrompt: original,\n      requestPrompt: original + correction, \n\n      previousValidatedAi: previousAi,\n\n      validatedAi: null,\n      validationPassed: false,\n      reviewPassed: false\n    }\n  };\n});\n"
+      },
+      "id": "c9e7c286-ce53-4843-b4e2-4274ca1525ca",
+      "name": "Prepare Generator Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allowedCats = new Set([\n  \"technology\",\n  \"skill\",\n  \"certification\",\n  \"industry\",\n  \"project_type\",\n  \"capability\",\n  \"requirement\",\n]);\nconst types = new Set([\"specification\", \"contractor_requirement\"]);\nconst levels = new Set([\"required\", \"preferred\", \"informational\"]);\nconst reqCats = new Set([\n  \"technical_specification\",\n  \"product_condition\",\n  \"bidder_qualification\",\n  \"delivery_condition\",\n  \"other\",\n]);\nconst norm = (s) =>\n  String(s || \"\")\n    .trim()\n    .toLowerCase()\n    .replace(/\\s+/g, \" \");\nconst out = [];\nfor (const item of $input.all()) {\n  const d = item.json,\n    errors = [];\n  let ai;\n  try {\n    const response = d.ollamaResponse;\n    if (response?.error) throw Error(JSON.stringify(response.error));\n    let raw = response?.message?.content;\n    if (typeof raw !== \"string\") throw Error(\"Missing message.content\");\n    raw = raw\n      .replace(/^```(?:json)?\\s*/i, \"\")\n      .replace(/\\s*```$/, \"\")\n      .trim();\n    ai = JSON.parse(raw);\n    if (!ai || Array.isArray(ai) || typeof ai !== \"object\")\n      throw Error(\"Expected JSON object\");\n  } catch (e) {\n    errors.push(\"JSON: \" + e.message);\n  }\n  if (ai) {\n    if (!Array.isArray(ai.aiExtractedRequirements))\n      errors.push(\"aiExtractedRequirements must be array\");\n    if (!Array.isArray(ai.tagSuggestions))\n      errors.push(\"tagSuggestions must be array\");\n    const requirements = Array.isArray(ai.aiExtractedRequirements)\n      ? ai.aiExtractedRequirements\n      : [];\n    const suggestions = Array.isArray(ai.tagSuggestions)\n      ? ai.tagSuggestions\n      : [];\n    if (requirements.length > 8) errors.push(\"Maximum 8 detailed requirements\");\n    const catalog = (d.tagCatalog || []).filter(\n      (t) => t && t.status !== \"inactive\",\n    );\n    const used = new Set();\n    for (const [i, r] of requirements.entries()) {\n      if (!r || typeof r.text !== \"string\" || !r.text.trim())\n        errors.push(`requirement[${i}] text missing`);\n      if (!reqCats.has(r?.category))\n        errors.push(`requirement[${i}] invalid category`);\n      if (!levels.has(r?.requirementLevel))\n        errors.push(`requirement[${i}] invalid requirementLevel`);\n      if (typeof r?.evidence !== \"string\" || !r.evidence.trim())\n        errors.push(`requirement[${i}] missing evidence`);\n    }\n    for (const [i, t] of suggestions.entries()) {\n      const k = `tagSuggestions[${i}]`;\n      if (![\"reuse\", \"create\"].includes(t?.action)) {\n        errors.push(k + \" action must be reuse or create\");\n        continue;\n      }\n      if (!levels.has(t.requirementLevel))\n        errors.push(k + \" invalid requirementLevel\");\n      if (typeof t.evidence !== \"string\" || !t.evidence.trim())\n        errors.push(k + \" missing evidence\");\n      if (\n        typeof t.confidence !== \"number\" ||\n        t.confidence < 0 ||\n        t.confidence > 1\n      )\n        errors.push(k + \" confidence must be 0..1\");\n      if (t.action === \"reuse\") {\n        if (t.action === \"reuse\") {\n          const id = String(t.tagId || \"\").trim();\n\n          if (!/^[a-f0-9]{24}$/i.test(id)) {\n            errors.push(k + \" invalid or missing tagId\");\n          } else {\n            const matches = catalog.filter(\n              (c) => String(c.id || c._id?.$oid || c._id || \"\") === id,\n            );\n\n            if (matches.length !== 1) {\n              errors.push(k + \" tagId not found in active catalog: \" + id);\n            } else {\n              const existing = matches[0];\n\n              // Use authoritative catalog data\n              t.tagId = id;\n              t.text = existing.text;\n\n              if (t.category && t.category !== existing.category) {\n                errors.push(k + \" category mismatch\");\n              }\n\n              if (t.type && t.type !== existing.type) {\n                errors.push(k + \" type mismatch\");\n              }\n\n              if (used.has(\"id:\" + id)) {\n                errors.push(k + \" duplicate existing tag\");\n              }\n\n              used.add(\"id:\" + id);\n            }\n          }\n        }\n      } else {\n        if (typeof t.text !== \"string\" || !t.text.trim())\n          errors.push(k + \" missing canonical text\");\n        if (\n          typeof t.contractorLabel !== \"string\" ||\n          !t.contractorLabel.trim()\n        ) {\n          errors.push(k + \" missing contractorLabel\");\n        } else {\n          t.contractorLabel = t.contractorLabel.trim();\n        }\n        if (!allowedCats.has(t.category)) errors.push(k + \" invalid category\");\n        if (!types.has(t.type)) errors.push(k + \" invalid type\");\n        if (t.tagId) errors.push(k + \" create must not specify tagId\");\n        const key = \"new:\" + t.category + \":\" + norm(t.text);\n        if (used.has(key))\n          errors.push(k + \" duplicate proposed canonical text\");\n        used.add(key);\n        const match = catalog.find(\n          (c) =>\n            c.category === t.category &&\n            c.type === t.type &&\n            [\n              c.text,\n              c.name,\n              ...(Array.isArray(c.aliases) ? c.aliases : []),\n            ].some((n) => norm(n) === norm(t.text)),\n        );\n        if (match)\n          errors.push(\n            k + \" duplicates \" + String(match.id || match._id) + \"; reuse it\",\n          );\n      }\n    }\n    if (\n      ai.budgetAmount != null &&\n      (typeof ai.budgetAmount !== \"number\" || ai.budgetAmount < 0)\n    )\n      errors.push(\"budgetAmount invalid\");\n    for (const k of [\"projectStartAt\", \"projectEndAt\"])\n      if (ai[k] != null && !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(ai[k])))\n        errors.push(k + \" ISO date or null\");\n  }\n  out.push({\n    json: {\n      ...d,\n      validatedAi: errors.length ? null : ai,\n      validationPassed: errors.length === 0,\n      lastValidationErrors: errors,\n      ollamaResponse: undefined,\n    },\n  });\n}\nreturn out;\n"
+      },
+      "id": "e4eb1918-43d2-4908-8af9-52bc5f6f34bd",
+      "name": "Validate AI Reuse Or Create",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f689c207-4f99-46d9-b1e9-57f42888c6b4",
+              "leftValue": "={{ $json.validationPassed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3392b602-0d4a-48e6-9044-3a8e149bcb86",
+      "name": "Schema Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst output = [];\n\nconst normalizeEvidence = value =>\n  String(value || \"\")\n    .normalize(\"NFKC\")\n    .toLowerCase()\n    .replace(/[\\u200B-\\u200D\\uFEFF]/g, \"\")\n    .replace(/[^\\p{L}\\p{N}]+/gu, \"\");\n\nfor (const item of $input.all()) {\n  const d = item.json;\n  const ai = d.validatedAi || {};\n\n  const catalog = (d.tagCatalog || []).map(t => ({\n    id: String(t.id?.$oid || t.id || \"\"),\n    name: t.text || t.name || \"\",\n    contractorLabel: t.contractorLabel || \"\",\n    category: t.category,\n    type: t.type,\n    aliases: t.aliases || []\n  }));\n\n  const totalTags = Number(\n    d.totalCatalogTags ?? catalog.length\n  );\n\n  const proposals = (ai.tagSuggestions || []).map(t => ({\n    action: t.action,\n    tagId: t.action === \"reuse\" ? t.tagId : undefined,\n    text: t.text,\n    contractorLabel:\n      t.action === \"reuse\"\n        ? catalog.find(c =>\n            c.id === String(t.tagId?.$oid || t.tagId)\n          )?.contractorLabel || \"\"\n        : t.contractorLabel,\n    category: t.category,\n    type: t.type,\n    requirementLevel: t.requirementLevel,\n    confidence: t.confidence,\n    evidence: t.evidence\n  }));\n\n  const source = String(d.sourceText || \"\");\n  const normalizedSource = normalizeEvidence(source);\n\n  const evidenceChecks = proposals.map((t, i) => {\n    const normalizedQuote = normalizeEvidence(t.evidence);\n\n    return {\n      index: i,\n      evidenceFound: Boolean(\n        normalizedQuote &&\n        normalizedSource.includes(normalizedQuote)\n      )\n    };\n  });\n\n  const instructions = [\n    \"Review procurement tag proposals independently.\",\n    \"Return valid JSON only.\",\n    \"\",\n    \"RULES:\",\n    \"- Reuse only when the catalog tag matches the evidence.\",\n    \"- Create only distinct, reusable concepts.\",\n    \"- Reject duplicates, synonyms and overlapping proposals.\",\n    \"- Reject tags already covered by the catalog.\",\n    \"- Reject unsupported or overly broad concepts.\",\n    \"- Do not reject valid concepts just to limit catalog size.\",\n    \"- Product and service categories are valid tags.\",\n    \"- Do not create tags for quantities, prices, dates,\",\n    \"  speeds, brands, models or minor variants.\",\n    \"- specification = goods, services or deliverables.\",\n    \"- contractor_requirement = bidder qualifications.\",\n    \"- Check requirementLevel and evidence meaning.\",\n    \"- Award announcements can support service-category tags.\",\n    \"- Every create proposal must have a nonempty contractorLabel.\",\n    \"- contractorLabel must express the same concept as text.\",\n    \"- Example: Internet Service → Internet Service Provider.\",\n    \"- text and contractorLabel are two labels for ONE tag, not duplicate tags.\",\n    \"- A provider label does not change specification to contractor_requirement.\",\n    \"- Reject unsupported licensing, certification or authorization in labels.\",\n    \"- contractorLabel may paraphrase the concept.\",\n    \"- For reuse proposals, the label comes from the existing catalog.\",\n    \"- Report label corrections using tagSuggestions[index].\",\n    \"- There is no fixed maximum number of tag suggestions.\",\n    \"\",\n    \"EVIDENCE:\",\n    \"- Evidence matching tolerates whitespace, line breaks,\",\n    \"  punctuation, Unicode formatting and letter case.\",\n    \"- evidenceFound=true means normalized evidence matches\",\n    \"  a continuous passage in the source document.\",\n    \"- Do not reject evidence for formatting differences.\",\n    \"- evidenceFound=false requires evidence correction or review.\",\n    \"- Reject changed facts, incorrect numbers or unsupported claims.\",\n    \"- A matching passage must support the proposed concept.\",\n    \"- If evidenceFound=false, request a supported source passage.\",\n    \"- Do not require English labels to appear in Thai source text.\",\n    \"- Evaluate semantic support separately from formatting.\",\n    \"\",\n    \"REVIEW CONSISTENCY:\",\n    \"- Reject only material errors in factual support,\",\n    \"  tag identity, classification or evidence.\",\n    \"- Do not reject valid tags merely because a more\",\n    \"  specific label is possible.\",\n    \"- Never recommend replacing a tag with itself.\",\n    \"- Never include KEEP recommendations in errors.\",\n    \"- Do not invent contractor qualifications or services.\",\n    \"- Bidder registration and financial eligibility\",\n    \"  are contractor_requirement concepts.\",\n    \"- Delivery deadlines, warranty periods and\",\n    \"  price evaluation methods are detailed conditions,\",\n    \"  not standalone reusable tags.\",\n    \"- Incidental installation with equipment does not\",\n    \"  establish an independent installation service.\",\n    \"- If a proposal is redundant or a generic contract\",\n    \"  condition, recommend REMOVE.\",\n    \"- Do not change a valid contractor_requirement\",\n    \"  to specification.\",\n    \"- If a tag is supported and correctly classified, accept it.\",\n    \"\",\n    \"DECISION:\",\n    \"- APPROVE when all proposals are materially valid.\",\n    \"- Otherwise REVISE.\",\n    \"- Report only proposals that actually require changes.\",\n    \"- Never report a valid proposal as an error.\",\n    \"- Never recommend KEEP in the errors array.\",\n    \"- Never recommend RENAME or CORRECT to the existing value.\",\n    \"- If recommending REUSE, provide an exact catalog tagId.\",\n    \"- Never invent tag IDs.\",\n    \"- If recommending MERGE, identify the proposal to retain.\",\n    \"- For each error, identify tagSuggestions[index],\",\n    \"  explain the issue and recommend REMOVE, MERGE,\",\n    \"  RENAME, REUSE or CORRECT.\",\n    \"- Keep each error under 30 words.\",\n    \"- Do not request changes to unrelated procurement fields.\",\n    \"\",\n    \"OUTPUT FORMAT:\",\n    '{\"decision\":\"approve\",\"errors\":[]}',\n    \"OR\",\n    '{\"decision\":\"revise\",\"errors\":[',\n    '\"tagSuggestions[1]: Duplicate concept. Recommendation: REMOVE.\",',\n    '\"tagSuggestions[2]: Unsupported classification. Recommendation: CORRECT type.\"',\n    \"]}\",\n    \"\",\n    \"CATALOG:\",\n    JSON.stringify(catalog),\n    \"\",\n    \"PROPOSALS:\",\n    JSON.stringify(proposals),\n    \"\",\n    \"EVIDENCE CHECKS:\",\n    JSON.stringify(evidenceChecks)\n  ];\n\n  output.push({\n    json: {\n      ...d,\n      reviewPrompt: instructions.join(\"\\n\"),\n      reviewerEvidenceChecks: evidenceChecks,\n      reviewerCatalogSize: totalTags\n    }\n  });\n}\n\nreturn output;\n"
+      },
+      "id": "6ec08201-21fe-45c7-a4f5-e6415cf94add",
+      "name": "Prepare Independent Tag Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const out=[];\nfor(let i=0;i<$input.all().length;i++){\n const response=$input.all()[i].json;\n const d=$('Prepare Independent Tag Review').itemMatching(i).json;\n let review=null;const errors=[];\n try{\n  if(response.error)throw Error(JSON.stringify(response.error));\n  let raw=String(response.message?.content||'').replace(/^```(?:json)?\\s*/i,'').replace(/\\s*```$/,'').trim();\n  review=JSON.parse(raw);\n  if(!review||!['approve','revise'].includes(review.decision)||!Array.isArray(review.errors))throw Error('Invalid review schema');\n  if(review.decision==='revise'&&!review.errors.length)throw Error('Revision needs specific errors');\n }catch(e){errors.push('Reviewer response: '+e.message)}\n const passed=!errors.length&&review.decision==='approve';\n out.push({json:{...d,reviewPassed:passed,reviewDecision:review?.decision||'invalid',lastValidationErrors:passed?[]:[...errors,...(review?.errors||[])],reviewPrompt:undefined}});\n}\nreturn out;"
+      },
+      "id": "6f10dc4e-55fe-4aa0-ad79-fda41fbb4455",
+      "name": "Validate Reviewer Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1904,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3ce5f778-ed6e-4e14-bdc1-8d1a0d29dfbf",
+              "leftValue": "={{ $json.reviewPassed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dbbc0d85-593f-49d7-9176-848f2ad0cc1f",
+      "name": "Reviewer Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2112,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "61fca7b1-d697-4119-861f-17e7a8414d4f",
+              "leftValue": "={{ Number($json.attempt || 1) < 4 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d79ace06-3d10-4a37-85ed-2caf65e6c501",
+      "name": "Retry Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1488,
+        1792
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn $input.all().map(item => {\n  const d = item.json;\n\n  const errors = Array.isArray(d.lastValidationErrors)\n    ? d.lastValidationErrors\n    : [];\n\n  return {\n    json: {\n      ...d,\n      attempt: Number(d.attempt || 1) + 1,\n\n      // Preserve reviewer recommendations\n      lastValidationErrors: errors,\n\n      // Preserve previously extracted data for correction\n      previousValidatedAi: d.validatedAi || d.previousValidatedAi || null,\n\n      // Reset validation/review state\n      validatedAi: null,\n      validationPassed: false,\n      reviewPassed: false,\n\n      // Clear previous model response\n      ollamaResponse: undefined,\n      reviewPrompt: undefined,\n      requestPrompt: undefined\n    }\n  };\n});\n"
+      },
+      "id": "ca211d91-6276-4762-b2df-a62793535fcc",
+      "name": "Prepare Retry Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        1776
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\n\nconst failures = items.map(item => ({\n  projectId: item.json.projectId,\n  tagReviewStatus: \"failed\",\n  attempts: Number(item.json.attempt || 1),\n  errors: item.json.lastValidationErrors || [],\n  note: \"No database write attempted\"\n}));\n\nthrow new Error(JSON.stringify(failures, null, 2));"
+      },
+      "id": "6554ac6c-ff02-4a84-af11-80337215c138",
+      "name": "Review Failed - No DB Write",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        2016
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst out = [];\n\nfor (let i = 0; i < $input.all().length; i++) {\n  const response = $input.all()[i].json;\n\n  // Restore original project metadata and AI prompts\n  const original = $('Prepare Generator Request')\n    .itemMatching(i).json;\n\n  out.push({\n    json: {\n      ...original,\n\n      // Ollama response for the validator\n      ollamaResponse: response,\n\n      // Preserve retry state\n      attempt: Number(original.attempt || 1),\n      lastValidationErrors: original.lastValidationErrors || [],\n\n      // Reset previous validation results\n      validatedAi: null,\n      validationPassed: false,\n      reviewPassed: false\n    },\n    pairedItem: { item: i }\n  });\n}\n\nreturn out;\n"
+      },
+      "id": "6b1f4a1a-0e1d-40ea-836b-49f98cd32ade",
+      "name": "Attach Generator Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst normalize = x => String(x || '').normalize('NFKC').trim().toLowerCase().replace(/\\s+/g, ' ');\nconst idOf = x => String(x?.$oid || x || '');\nfor (const { json: d } of $input.all()) {\n  if (!d.validationPassed || !d.reviewPassed || !d.validatedAi || !d.projectId) {\n    throw new Error('Expected approved AI data and projectId');\n  }\n  const ai = d.validatedAi;\n  const catalog = d.tagCatalog || [];\n  const canonical = [];\n  const seen = new Set();\n  for (const t of (ai.tagSuggestions || [])) {\n    if (!['required','preferred','informational'].includes(t.requirementLevel) ||\n        !Number.isFinite(Number(t.confidence)) || Number(t.confidence) < 0 || Number(t.confidence) > 1 ||\n        !String(t.evidence || '').trim()) throw new Error('Invalid tag assignment attributes');\n    if (t.action === 'reuse') {\n      if (!catalog.some(c => idOf(c.id) === idOf(t.tagId))) throw new Error('Unrecognized tagId ' + t.tagId);\n    } else if (t.action === 'create') {\nconst text = String(t.text || '').trim();\nconst category = String(t.category || '').trim();\nconst contractorLabel = typeof t.contractorLabel === 'string'\n  ? t.contractorLabel.trim()\n  : '';\n\nif (\n  !text ||\n  !category ||\n  !contractorLabel ||\n  !['specification', 'contractor_requirement'].includes(t.type)\n) {\n  throw new Error(\n    'Invalid new tag: text, category, type and contractorLabel are required'\n  );\n}\n      const key = category + '|' + normalize(text);\n      if (seen.has(key)) throw new Error('Duplicate created tag ' + text);\n      seen.add(key);\ncanonical.push({\n  text,\n  contractorLabel,\n  category,\n  type: t.type,\n  aliases: [],\n  status: 'active'\n});\n    } else throw new Error('Unknown tag action: ' + t.action);\n  }\n  // Input collection 'tags' can be empty. $unionWith injects candidates\n  // from the matching TOR document instead of relying on an existing tag.\n  // Requires a UNIQUE compound index on {category:1,text:1} in 'tags'.\n  const pipeline = [\n    {$match:{_id:{$exists:false}}},\n    {$unionWith:{\n      coll:'tor_announcements',\n      pipeline:[\n        {$match:{projectId:String(d.projectId)}},\n        {$limit:1},\n        {$project:{items:{$literal:canonical}}},\n        {$unwind:'$items'},\n        {$replaceRoot:{newRoot:'$items'}}\n      ]\n    }},\n    {$merge:{into:'tags',on:['category','text'],whenMatched:'keepExisting',whenNotMatched:'insert'}}\n  ];\n  results.push({json:{...d,tagUpsertPipeline:JSON.stringify(pipeline),newTagCount:canonical.length}});\n}\nreturn results;"
+      },
+      "id": "5d9aaae3-08aa-49be-a02a-a00e3dafd42a",
+      "name": "Prepare Canonical Tag Upsert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        1456
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/10 4-12 * * *"
+            }
+          ]
+        }
+      },
+      "id": "14ee8866-8505-4212-bba1-3e641b63e3fc",
+      "name": "04:00-10:00 Every 10 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -576,
+        1152
+      ]
+    }
+  ],
+  "connections": {
+    "Download TOR Document": {
+      "main": [
+        [
+          {
+            "node": "Detect Document Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Document Format": {
+      "main": [
+        [
+          {
+            "node": "Route Document Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Document Format": {
+      "main": [
+        [
+          {
+            "node": "Decode Thai HTML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare ZIP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unsupported Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode Thai HTML": {
+      "main": [
+        [
+          {
+            "node": "Extract HTML Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract HTML Text": {
+      "main": [
+        [
+          {
+            "node": "HTML Text Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML Text Result": {
+      "main": [
+        [
+          {
+            "node": "Group Documents by Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "PDF Text Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Text Result": {
+      "main": [
+        [
+          {
+            "node": "Group Documents by Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare ZIP": {
+      "main": [
+        [
+          {
+            "node": "Decompress ZIP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decompress ZIP": {
+      "main": [
+        [
+          {
+            "node": "Split ZIP PDFs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split ZIP PDFs": {
+      "main": [
+        [
+          {
+            "node": "Extract ZIP PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract ZIP PDF Text": {
+      "main": [
+        [
+          {
+            "node": "ZIP PDF Text Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ZIP PDF Text Result": {
+      "main": [
+        [
+          {
+            "node": "Group Documents by Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unsupported Format": {
+      "main": [
+        [
+          {
+            "node": "Group Documents by Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare PDF Test": {
+      "main": [
+        [
+          {
+            "node": "Download TOR Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Text Processing Marker": {
+      "main": [
+        [
+          {
+            "node": "Mark Missing Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group Documents by Project": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find AI Unprocessed TOR": {
+      "main": [
+        [
+          {
+            "node": "Prepare PDF Test",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wake Qwen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wake Qwen": {
+      "main": [
+        [
+          {
+            "node": "Check Qwen Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Qwen Status": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Has Extracted Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Active Tag Catalog": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Prompt With Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Extracted Text": {
+      "main": [
+        [
+          {
+            "node": "Save Extracted Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Text Processing Marker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Extracted Text": {
+      "main": [
+        [
+          {
+            "node": "Load Active Tag Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Prompt With Catalog": {
+      "main": [
+        [
+          {
+            "node": "Prepare Generator Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Canonical Tags": {
+      "main": [
+        [
+          {
+            "node": "Reload Active Canonical Tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reload Active Canonical Tags": {
+      "main": [
+        [
+          {
+            "node": "Prepare BSON Tag Assignments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare BSON Tag Assignments": {
+      "main": [
+        [
+          {
+            "node": "Save TOR With Linked Tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save TOR With Linked Tags": {
+      "main": [
+        [
+          {
+            "node": "Reload Saved TOR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reload Saved TOR": {
+      "main": [
+        [
+          {
+            "node": "Verify Linked Tag IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qwen Tag Reviewer HTTP": {
+      "main": [
+        [
+          {
+            "node": "Validate Reviewer Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qwen 3.5 4B HTTP": {
+      "main": [
+        [
+          {
+            "node": "Attach Generator Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Generator Request": {
+      "main": [
+        [
+          {
+            "node": "Qwen 3.5 4B HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate AI Reuse Or Create": {
+      "main": [
+        [
+          {
+            "node": "Schema Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schema Valid?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Independent Tag Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retry Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Independent Tag Review": {
+      "main": [
+        [
+          {
+            "node": "Qwen Tag Reviewer HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Reviewer Decision": {
+      "main": [
+        [
+          {
+            "node": "Reviewer Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reviewer Approved?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Canonical Tag Upsert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retry Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Available?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Retry Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Review Failed - No DB Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Retry Context": {
+      "main": [
+        [
+          {
+            "node": "Prepare Generator Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Generator Response": {
+      "main": [
+        [
+          {
+            "node": "Validate AI Reuse Or Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Canonical Tag Upsert": {
+      "main": [
+        [
+          {
+            "node": "Upsert Canonical Tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04:00-10:00 Every 10 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Find AI Unprocessed TOR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fec1019c9d1e988c58a5e82a15d8d9eecfe7755863c845a82430909ad451696a"
+  }
+}

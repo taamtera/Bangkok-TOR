@@ -1,0 +1,674 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "ingestion_runs",
+        "fields": "sourceId,fetchedAt,executionId,scope,summaryType,request,departmentCount,stageCount,requestCount,reportedCount,itemsReceived,keywordMatchedCount,keywordRejectedCount,completeRequestCount,incompleteRequestCount,missingAnnouncementCount,complete,paginationSupported,coverage,titleFilterVersions,byDepartment,byStage",
+        "options": {}
+      },
+      "id": "967ba5db-1c3f-49ea-8a2d-c32b9df54045",
+      "name": "MongoDB - Log Ingestion Run",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.3,
+      "position": [
+        832,
+        496
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $input.all();\nconst requests = $('Department + Stage Requests').all();\nif (inputs.length !== requests.length) throw new Error('Not every announcement request was parsed.');\nconst text = value => typeof value === 'string' ? value : String(value?._ ?? value ?? '');\nconst departments = new Map(), stages = new Map(), dates = new Set(), versions = new Set(), seenRequests = new Set();\nconst counts = () => ({requestCount:0,reportedCount:0,itemsReceived:0,keywordMatchedCount:0,keywordRejectedCount:0,incompleteRequestCount:0});\nconst totals = counts();\nfor (let i=0;i<inputs.length;i++) {\n  const input = inputs[i].json, req = requests[i].json;\n  const requestKey = JSON.stringify([req.deptId,req.announcementType,req.announceDate]);\n  if (seenRequests.has(requestKey)) throw new Error('Duplicate department/stage/date request.');\n  seenRequests.add(requestKey);\n  const channel = input.rss?.channel;\n  if (!channel || channel.countbyday === undefined) throw new Error('Missing RSS channel/countbyday for '+req.deptId+'/'+req.announcementType);\n  const reportedCount = Number(text(channel.countbyday));\n  const stats = input.titleFilter;\n  if (!Number.isInteger(reportedCount) || reportedCount<0) throw new Error('Invalid countbyday.');\n  if (!stats || ![stats.inputCount,stats.matchedCount,stats.rejectedCount].every(n=>Number.isInteger(n)&&n>=0) || stats.matchedCount+stats.rejectedCount!==stats.inputCount) throw new Error('Invalid title filter counts.');\n  const items = Array.isArray(channel.item)?channel.item:channel.item?[channel.item]:[];\n  if (items.length!==stats.matchedCount) throw new Error('Filtered RSS items do not match keyword counts.');\n  const expectedDate = req.announceDate.replace(/^(\\d{4})(\\d{2})(\\d{2})$/,'$1-$2-$3');\n  for (const item of items) if (text(item.pubDate||item.pubdate).slice(0,10)!==expectedDate) throw new Error('Feed returned an unexpected publication date.');\n  dates.add(req.announceDate);versions.add(stats.version);\n  if (!departments.has(req.deptId)) departments.set(req.deptId,{departmentId:req.deptId,departmentName:req.departmentName,...counts()});\n  if (!stages.has(req.announcementType)) stages.set(req.announcementType,{announcementType:req.announcementType,announcementLabel:req.announcementLabel,...counts()});\n  for (const summary of [totals,departments.get(req.deptId),stages.get(req.announcementType)]) {\n    summary.requestCount++;\n    summary.reportedCount+=reportedCount;\n    summary.itemsReceived+=stats.inputCount;\n    summary.keywordMatchedCount+=stats.matchedCount;\n    summary.keywordRejectedCount+=stats.rejectedCount;\n    if (stats.inputCount!==reportedCount) summary.incompleteRequestCount++;\n  }\n}\nconst complete = totals.incompleteRequestCount===0;\nreturn [{json:{\n  sourceId:'EGP',fetchedAt:new Date().toISOString(),\n  executionId:typeof $execution==='undefined'?null:String($execution.id),\n  scope:'selected_departments',summaryType:'rss_fetch',\n  request:{announceDates:[...dates],departmentIds:[...departments.keys()],announcementTypes:[...stages.keys()]},\n  departmentCount:departments.size,stageCount:stages.size,...totals,\n  completeRequestCount:totals.requestCount-totals.incompleteRequestCount,\n  missingAnnouncementCount:Math.max(0,totals.reportedCount-totals.itemsReceived),\n  complete,paginationSupported:false,coverage:complete?'complete_for_requests':'rss_latest_20_only',\n  titleFilterVersions:[...versions],\n  byDepartment:[...departments.values()],byStage:[...stages.values()]\n}}];"
+      },
+      "id": "fa5a650c-e08b-4da9-ba30-fc0fa67f5ccb",
+      "name": "Build RSS Run Metadata",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Title-only, broad software/IT keyword screening. Edit these lists as needed.\n// Short English terms use boundaries: 'IT' must not match 'audit' or 'committee'.\nconst thaiTerms = [\n  \"ซอฟต์แวร์\",\n  \"ซอฟท์แวร์\",\n  \"ซอฟทแวร์\",\n  \"ซอฟแวร์\",\n  \"ซอฟต์แวร\",\n  \"ซอฟท์แวร\",\n  \"ซอฟแวร\",\n  \"โปรแกรม\",\n  \"แอปพลิเคชัน\",\n  \"แอปพลิเคชั่น\",\n  \"แอพพลิเคชัน\",\n  \"แอพพลิเคชั่น\",\n  \"แอปพลิเคชั่่น\",\n  \"เว็บไซต์\",\n  \"เว็ปไซต์\",\n  \"เว็บไซด์\",\n  \"เว็บแอป\",\n  \"เว็บแอพ\",\n  \"เว็บพอร์ทัล\",\n  \"เว็บเซอร์วิส\",\n  \"ระบบสารสนเทศ\",\n  \"สารสนเทศ\",\n  \"เทคโนโลยีสารสนเทศ\",\n  \"ระบบข้อมูล\",\n  \"ระบบฐานข้อมูล\",\n  \"ฐานข้อมูล\",\n  \"ระบบดิจิทัล\",\n  \"ระบบงาน\",\n  \"ระบบคอมพิวเตอร์\",\n  \"คอมพิวเตอร์\",\n  \"คอมพิวเตอร\",\n  \"เซิร์ฟเวอร์\",\n  \"เซิฟเวอร์\",\n  \"เซอร์เวอร์\",\n  \"เครื่องแม่ข่าย\",\n  \"เครื่องลูกข่าย\",\n  \"ศูนย์ข้อมูล\",\n  \"ดาต้าเซ็นเตอร์\",\n  \"คลาวด์\",\n  \"คลาวด\",\n  \"ระบบเครือข่าย\",\n  \"เครือข่ายคอมพิวเตอร์\",\n  \"เครือข่ายอินเทอร์เน็ต\",\n  \"อินเทอร์เน็ต\",\n  \"อินเตอร์เน็ต\",\n  \"ไฟร์วอลล์\",\n  \"ไฟร์วอล\",\n  \"ไซเบอร์\",\n  \"ปัญญาประดิษฐ์\",\n  \"ระบบอัตโนมัติ\",\n  \"ไอที\",\n  \"ไอ ที\",\n  \"ไอซีที\",\n  \"ไอ ซี ที\",\n  \"ดิจิทัล\",\n  \"ดิจิตอล\",\n  \"ระบบปฏิบัติการ\",\n  \"ระบบสำรองข้อมูล\",\n  \"สำรองข้อมูล\",\n  \"จัดเก็บข้อมูล\",\n  \"ประมวลผลข้อมูล\",\n  \"ความมั่นคงปลอดภัยสารสนเทศ\",\n  \"ความปลอดภัยสารสนเทศ\",\n  \"ภูมิสารสนเทศ\",\n  \"ประชุมทางไกล\",\n  \"ระบบประชุมออนไลน์\",\n  \"วิดีโอคอนเฟอเรนซ์\",\n  \"วีดีโอคอนเฟอเรนซ์\",\n  \"เราเตอร์\",\n  \"เราท์เตอร์\"\n];\nconst englishTerms = [\n  \"software\",\n  \"software development\",\n  \"software license\",\n  \"software licence\",\n  \"information technology\",\n  \"information system\",\n  \"information systems\",\n  \"it\",\n  \"ict\",\n  \"application\",\n  \"applications\",\n  \"app\",\n  \"apps\",\n  \"web\",\n  \"website\",\n  \"websites\",\n  \"web portal\",\n  \"computer\",\n  \"computers\",\n  \"server\",\n  \"servers\",\n  \"database\",\n  \"databases\",\n  \"data center\",\n  \"data centre\",\n  \"cloud\",\n  \"saas\",\n  \"paas\",\n  \"iaas\",\n  \"api\",\n  \"apis\",\n  \"erp\",\n  \"crm\",\n  \"gis\",\n  \"his\",\n  \"lis\",\n  \"digital\",\n  \"cybersecurity\",\n  \"cyber security\",\n  \"firewall\",\n  \"network\",\n  \"networking\",\n  \"internet\",\n  \"intranet\",\n  \"data analytics\",\n  \"data warehouse\",\n  \"business intelligence\",\n  \"artificial intelligence\",\n  \"machine learning\",\n  \"ai\",\n  \"operating system\",\n  \"backup\",\n  \"storage\",\n  \"microsoft\",\n  \"windows\",\n  \"office 365\",\n  \"adobe\",\n  \"oracle\",\n  \"vmware\",\n  \"autodesk\",\n  \"sap\",\n  \"sql\",\n  \"linux\",\n  \"videoconference\",\n  \"video conference\",\n  \"video conferencing\",\n  \"teleconference\",\n  \"voip\",\n  \"router\"\n];\nconst text = value => typeof value === 'string' ? value : String(value?._ ?? value ?? '');\nconst normalize = value => text(value).normalize('NFKC').toLowerCase().replace(/[\\u200b-\\u200d\\ufeff]/g,'').replace(/[-–—_/]+/g,' ').replace(/\\s+/g,' ').trim();\nconst englishRules = englishTerms.map(term=>({term,pattern:new RegExp('(?:^|[^a-z0-9])'+term.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&')+'(?:$|[^a-z0-9])','i')}));\nreturn $input.all().map((input,i)=>{\n  const channel = input.json.rss?.channel;\n  if (!channel) throw new Error('Missing decoded RSS channel.');\n  const items = !channel.item ? [] : Array.isArray(channel.item) ? channel.item : [channel.item];\n  const matching = [];\n  for (const item of items) {\n    const title = normalize(item.title);\n    const matches = [...thaiTerms.filter(term=>title.includes(normalize(term))),...englishRules.filter(rule=>rule.pattern.test(title)).map(rule=>rule.term)];\n    if (matches.length) matching.push({...item,titleMatchedKeywords:[...new Set(matches)]});\n  }\n  // Preserve one envelope per requested stage, including stages with zero matches.\n  return {json:{...input.json,rss:{...input.json.rss,channel:{...channel,item:matching}},titleFilter:{\n    version:'software-it-title-v1',inputCount:items.length,matchedCount:matching.length,rejectedCount:items.length-matching.length\n  }},pairedItem:{item:i}};\n});"
+      },
+      "name": "Filter Software IT Titles",
+      "id": "fb6dceff-67a9-4bba-8b4b-1d0c48ed92c8",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "dataPropertyName": "xml",
+        "options": {
+          "explicitArray": false,
+          "explicitRoot": true
+        }
+      },
+      "id": "57ded930-9a93-496f-9328-add623c84a83",
+      "name": "XML to JSON1",
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        224,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $input.all();\nconst requests = $('Department + Stage Requests').all();\nif (inputs.length !== requests.length) throw new Error('Not every announcement request returned a response.');\nconst windows874 = \"€…‘’“”•–— กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรฤลฦวศษสหฬอฮฯะัาำิีึืฺุู฿เแโใไๅๆ็่้๊๋์ํ๎๏๐๑๒๓๔๕๖๗๘๙๚๛\";\nconst output = [];\nfor (let i = 0; i < inputs.length; i++) {\n  const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n  const header = buffer.subarray(0,200).toString('ascii');\n  const thaiEncoding = /encoding=[\"'](?:windows-?874|tis-?620)[\"']/i.test(header);\n  let xml = thaiEncoding ? Array.from(buffer, b => b < 128 ? String.fromCharCode(b) : windows874[b-128]).join('') : buffer.toString('utf8');\n  if (!/<rss[\\s>]/i.test(xml)) throw new Error('Expected RSS XML for announcement type ' + requests[i].json.announcementType);\n  if (xml.includes('\\uFFFD')) throw new Error('Invalid Thai encoding for announcement type ' + requests[i].json.announcementType);\n  xml = xml.replace(/encoding=[\"'][^\"']+[\"']/i, 'encoding=\"UTF-8\"');\n  output.push({json:{xml},pairedItem:{item:i}});\n}\nreturn output;"
+      },
+      "id": "21b7d1e5-4912-4a53-8bc3-98d8b288b652",
+      "name": "Decode Thai Windows-874",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://process.gprocurement.go.th/EPROCRssFeedWeb/egpannouncerss.xml",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "announceDate",
+              "value": "={{ $json.announceDate }}"
+            },
+            {
+              "name": "anounceType",
+              "value": "={{ $json.announcementType }}"
+            },
+            {
+              "name": "deptId",
+              "value": "={{ $json.deptId }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 20000
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "6654738d-0655-4315-8fa5-1a44cf508942",
+      "name": "e-GP - Fetch Department Stage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -224,
+        560
+      ],
+      "executeOnce": false,
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const agencies = [\n  {\n    \"deptId\": \"0806\",\n    \"name\": \"กรมทางหลวง\"\n  },\n  {\n    \"deptId\": \"0807\",\n    \"name\": \"กรมทางหลวงชนบท\"\n  },\n  {\n    \"deptId\": \"0703\",\n    \"name\": \"กรมชลประทาน\"\n  },\n  {\n    \"deptId\": \"1507\",\n    \"name\": \"กรมโยธาธิการและผังเมือง\"\n  },\n  {\n    \"deptId\": \"1508\",\n    \"name\": \"กรมส่งเสริมการปกครองท้องถิ่น\"\n  },\n  {\n    \"deptId\": \"0204\",\n    \"name\": \"กองทัพบก\"\n  },\n  {\n    \"deptId\": \"0205\",\n    \"name\": \"กองทัพเรือ\"\n  },\n  {\n    \"deptId\": \"0206\",\n    \"name\": \"กองทัพอากาศ\"\n  },\n  {\n    \"deptId\": \"0208\",\n    \"name\": \"กองบัญชาการกองทัพไทย\"\n  },\n  {\n    \"deptId\": \"0805\",\n    \"name\": \"กรมท่าอากาศยาน\"\n  },\n  {\n    \"deptId\": \"0803\",\n    \"name\": \"กรมเจ้าท่า\"\n  },\n  {\n    \"deptId\": \"0307\",\n    \"name\": \"กรมสรรพากร\"\n  }\n];\nconst stages = [\n  {\n    \"code\": \"P0\",\n    \"label\": \"แผนการจัดซื้อจัดจ้าง\"\n  },\n  {\n    \"code\": \"15\",\n    \"label\": \"ประกาศราคากลาง\"\n  },\n  {\n    \"code\": \"B0\",\n    \"label\": \"ร่างเอกสารประกวดราคา\"\n  },\n  {\n    \"code\": \"D0\",\n    \"label\": \"ประกาศเชิญชวน\"\n  },\n  {\n    \"code\": \"W0\",\n    \"label\": \"ประกาศรายชื่อผู้ชนะการเสนอราคา / ประกาศผู้ได้รับการคัดเลือก\"\n  },\n  {\n    \"code\": \"D1\",\n    \"label\": \"ยกเลิกประกาศเชิญชวน\"\n  },\n  {\n    \"code\": \"W1\",\n    \"label\": \"ยกเลิกประกาศรายชื่อผู้ชนะการเสนอราคา / ประกาศผู้ได้รับการคัดเลือก\"\n  },\n  {\n    \"code\": \"D2\",\n    \"label\": \"เปลี่ยนแปลงประกาศเชิญชวน\"\n  },\n  {\n    \"code\": \"W2\",\n    \"label\": \"เปลี่ยนแปลงประกาศรายชื่อผู้ชนะการเสนอราคา\"\n  }\n];\n// Yesterday in Bangkok time. To replay a day, set an explicit YYYYMMDD here.\nconst dateOverride = '';\nconst announceDate = dateOverride || $now.setZone('Asia/Bangkok').minus({days:1}).toFormat('yyyyMMdd');\nconst requests = [];\nfor (const agency of agencies) for (const stage of stages) {\n// if (requests.length >= 1) break;\n  requests.push({json:{deptId:agency.deptId,departmentName:agency.name,\n    announceDate,announcementType:stage.code,announcementLabel:stage.label,scope:'department'}});\n}\nreturn requests;"
+      },
+      "id": "625962bf-c058-4b08-9ae4-8883d4707c3c",
+      "name": "Department + Stage Requests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "collection": "tor_announcements",
+        "options": {
+          "limit": 10000
+        },
+        "query": "={{ $json.query }}"
+      },
+      "name": "Find Existing Projects Batch",
+      "id": "779e0ad4-aebc-410f-ab66-432f04470caf",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.3,
+      "position": [
+        -144,
+        960
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "findOneAndUpdate",
+        "collection": "tor_announcements",
+        "updateKey": "projectId",
+        "fields": "sourceId,scope,departmentId,departmentName,projectId,linkedProjectId,identityScope,title,description,publishedAt,url,documentUrl,thumbnail,thumbnailSourceUrl,procurementMethod,status,statusPublishedAt,statusOrderAmbiguous,stageObservations,biddingOpenVerified,channelParams,itemParams,firstSeenAt,lastSeenAt,titleMatchedKeywords",
+        "upsert": true,
+        "options": {}
+      },
+      "name": "MongoDB - Upsert TOR Announcements",
+      "id": "d6103cb7-6870-49e7-bb6f-cf92f5bb8f6f",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.3,
+      "position": [
+        352,
+        960
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const projectIds = [...new Set($input.all().map(item=>String(item.json.projectId)))];\nif (!projectIds.length) return [];\nreturn [{json:{query:JSON.stringify({projectId:{$in:projectIds}})}}];"
+      },
+      "name": "Build Project Batch Lookup",
+      "id": "145c76ec-b1fb-4b54-bf15-813c44d291a1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function isThumbnailCandidate(url) {\n  if (typeof url !== 'string' || !/^https?:\\/\\//i.test(url)) return false;\n  if (/\\.(pdf|png|jpe?g|webp|gif|tiff?)(?:[?#]|$)/i.test(url)) return true;\n  return /^https?:\\/\\/process\\d*\\.gprocurement\\.go\\.th\\//i.test(url) && (\n    /\\/egp-(?:template-service\\/dwnt\\/view-pdf-file|upload-service\\/v1\\/downloadFileTest)(?:[?#]|$)/i.test(url) ||\n    /\\/egp-agpc01-web\\/common\\/download\\/[^/?#]+\\/[^/?#]+(?:[?#]|$)/i.test(url)\n  );\n}\nconst requests = $('Department + Stage Requests').all();\nconst inputs = $input.all();\nif (requests.length !== inputs.length) throw new Error('RSS responses do not match the requested announcement types.');\nconst statuses = {P0:'procurement_planned','15':'reference_price_published',B0:'draft_tender_published',D0:'invitation_published',W0:'award_published',D1:'invitation_cancelled',W1:'award_cancelled',D2:'invitation_amended',W2:'award_amended'};\nconst text = v => typeof v === 'string' ? v : String(v?._ ?? v ?? '');\nfunction params(raw) {\n  const q = text(raw).replace(/&amp;/g,'&').split('?')[1]?.split('#')[0] || '';\n  return Object.fromEntries(q.split('&').filter(Boolean).map(part => {\n    const [k,...v] = part.split('=');\n    try { return [decodeURIComponent(k),decodeURIComponent(v.join('=').replace(/\\+/g,' '))]; }\n    catch { throw new Error('Invalid URL query encoding in RSS item.'); }\n  }));\n}\nconst now = new Date().toISOString(), output = [];\nfor (let i=0;i<inputs.length;i++) {\n  const req = requests[i].json;\n  if (!statuses[req.announcementType]) throw new Error('Unsupported requested announcement type.');\n  const channel = inputs[i].json.rss?.channel;\n  if (!channel) throw new Error('Missing RSS channel.');\n  const items = !channel.item ? [] : Array.isArray(channel.item) ? channel.item : [channel.item];\n  const channelParams = params(channel.link);\n  delete channelParams.announceType; // Website routing value is not the feed event type.\n  for (const item of items) {\n    const url = text(item.link), itemParams = params(url), description = text(item.description);\n    const parts = description.split(',').map(s=>s.trim());\n    const describedId = /^[PM]?\\d{11}$/.test(parts[0]) ? parts[0] : null;\n    const linkedId = /^[PM]?\\d{11}$/.test(itemParams.projectId||'') ? itemParams.projectId : null;\n    const projectIdConflict = req.announcementType !== 'P0' && describedId && linkedId && describedId !== linkedId;\n    if (projectIdConflict) throw new Error('Conflicting project identifiers: ' + describedId + ' / ' + linkedId);\n    const projectId = describedId || linkedId;\n    const templateId = itemParams.templateId || null;\n    const publishedAt = text(item.pubDate||item.pubdate).slice(0,10);\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(publishedAt) || new Date(publishedAt+'T00:00:00Z').toISOString().slice(0,10)!==publishedAt) throw new Error('Invalid publication date.');\n    if (publishedAt.replace(/-/g,'')!==req.announceDate) throw new Error('RSS returned the wrong requested date.');\n    const title = text(item.title);\n    const fallbackIdentity = JSON.stringify([projectId,req.announcementType,publishedAt,title,description]);\n    const documentKey = templateId ? 'template:'+templateId : url ? 'url:'+url : 'content:'+fallbackIdentity;\n    const identityQuality = templateId ? 'template_id' : url ? 'document_url' : 'project_type_date_content';\n    const announcementKey = 'EGP:'+req.announcementType+':'+documentKey;\n    const identityScope = req.announcementType === 'P0' ? 'plan' : projectId ? 'project' : 'document';\n    const projectKey = projectId ? 'EGP:'+identityScope+':'+projectId : 'EGP:document:'+documentKey;\n    const enclosure = Array.isArray(item.enclosure) ? item.enclosure[0] : item.enclosure;\n    const enclosureUrl = typeof enclosure==='string' ? enclosure : enclosure?.url || enclosure?.$?.url;\n    const documentUrl = text(item.pdfUrl||item.pdf_url||item.documentUrl||item.document_url||item.fileUrl||item.file_url||enclosureUrl||url);\n    output.push({json:{\n      sourceId:'EGP',scope:'department',departmentId:req.deptId,departmentName:req.departmentName,\n      projectId,linkedProjectId:linkedId,projectKey,identityScope,\n      announcementKey,identityQuality,templateId,title:title||null,description,publishedAt,url:url||null,documentUrl:documentUrl||null,\n      thumbnail:isThumbnailCandidate(documentUrl) ? '/api/thumbnail/'+encodeURIComponent(projectId) : null,\n      thumbnailSourceUrl:documentUrl?'https://wsrv.nl/?url='+encodeURIComponent(documentUrl)+'&page=0&w=600&output=webp&q=80':null,\n      procurementMethod:parts[1] && parts[1]!==\"' '\"?parts[1]:null,\n      announcementType:req.announcementType,announcementLabel:req.announcementLabel,\n      responseAnnouncementLabel:parts.slice(2).join(', ')||null,\n      status:statuses[req.announcementType],biddingOpenVerified:false,titleMatchedKeywords:item.titleMatchedKeywords||[],\n      channelParams,itemParams,firstSeenAt:now,lastSeenAt:now\n    },pairedItem:{item:i}});\n  }\n}\nconst projects = new Map();\nfor (const entry of output) {\n  const event = entry.json;\n  const code = event.announcementType;\n  const observation = {...event};\n  // These document identifiers remain available inside the raw itemParams.\n  for (const key of ['templateId','announcementType','announcementKey','identityQuality','announcementLabel','responseAnnouncementLabel']) delete observation[key];\n  let project = projects.get(event.projectKey);\n  if (!project) {\n    project = {json:{projectKey:event.projectKey,stageObservations:{}},pairedItem:entry.pairedItem};\n    projects.set(event.projectKey,project);\n  }\n  const previous = project.json.stageObservations[code];\n  if (!previous || observation.publishedAt > previous.publishedAt || (observation.publishedAt === previous.publishedAt && String(observation.url||observation.description).localeCompare(String(previous.url||previous.description)) > 0)) project.json.stageObservations[code] = observation;\n}\nreturn [...projects.values()].filter(entry=>{\n  const event = Object.values(entry.json.stageObservations)[0];\n  if (!event?.projectId) { console.warn('Skipping announcement without a verified project ID.'); return false; }\n  entry.json.projectId = String(event.projectId);\n  return true;\n});"
+      },
+      "name": "Normalize RSS + Thumbnail",
+      "id": "f14bd070-9014-40ab-9a01-ca62a6952aa7",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -624,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function isThumbnailCandidate(url) {\n  if (typeof url !== 'string' || !/^https?:\\/\\//i.test(url)) return false;\n  if (/\\.(pdf|png|jpe?g|webp|gif|tiff?)(?:[?#]|$)/i.test(url)) return true;\n  return /^https?:\\/\\/process\\d*\\.gprocurement\\.go\\.th\\//i.test(url) && (\n    /\\/egp-(?:template-service\\/dwnt\\/view-pdf-file|upload-service\\/v1\\/downloadFileTest)(?:[?#]|$)/i.test(url) ||\n    /\\/egp-agpc01-web\\/common\\/download\\/[^/?#]+\\/[^/?#]+(?:[?#]|$)/i.test(url)\n  );\n}\nconst candidates = $('Normalize RSS + Thumbnail').all();\nconst oldById = new Map();\nfor (const item of $input.all()) {\n  const old = item.json;\n  if (!old.projectId) continue;\n  const id = String(old.projectId);\n  if (oldById.has(id)) throw new Error('Duplicate projectId in tor_announcements: '+id+'. Complete the database migration first.');\n  oldById.set(id,old);\n}\nreturn candidates.map((entry,i)=>{\nconst incoming = entry.json;\nconst previous = oldById.get(String(incoming.projectId)) || {};\nconst allowed = ['P0','15','B0','D0','W0','D1','W1','D2','W2'];\nconst observations = {};\nfor (const code of allowed) {\n  const prior = previous.stageObservations?.[code];\n  const next = incoming.stageObservations?.[code];\n  if (!prior && !next) continue;\n  if (!next) { observations[code] = prior; continue; }\n  const nextWins = !prior || next.publishedAt > prior.publishedAt || (next.publishedAt === prior.publishedAt && String(next.url||next.description).localeCompare(String(prior.url||prior.description)) >= 0);\n  observations[code] = {...(nextWins ? next : prior),firstSeenAt:prior?.firstSeenAt||next.firstSeenAt,lastSeenAt:next.lastSeenAt};\n}\nconst entries = Object.entries(observations).sort((a,b)=>a[1].publishedAt.localeCompare(b[1].publishedAt)||a[0].localeCompare(b[0]));\nif (!entries.length) throw new Error('Project has no stage observations.');\nconst lastDate = entries[entries.length-1][1].publishedAt;\nconst latest = entries.filter(([,event])=>event.publishedAt === lastDate);\nconst ambiguous = latest.length > 1;\n// Representative display fields are deterministic; they do not establish stage order.\nconst representative = latest[latest.length-1][1];\nconst now = new Date().toISOString();\nconst result = {\n  ...representative,\n  projectId:String(incoming.projectId),\n  departmentId:representative.departmentId||previous.departmentId||null,\n  departmentName:representative.departmentName||previous.departmentName||null,\n  status:ambiguous?'multiple_announcements_same_day':representative.status,\n  statusPublishedAt:lastDate,statusOrderAmbiguous:ambiguous,\n  stageObservations:observations,biddingOpenVerified:false,\n  firstSeenAt:previous.firstSeenAt||representative.firstSeenAt,lastSeenAt:now\n};\n// Recompute the display route for saved observations as well as new ones.\nresult.thumbnail = isThumbnailCandidate(result.documentUrl) ? '/api/thumbnail/'+encodeURIComponent(result.projectId) : null;\ndelete result.projectKey;\nfor (const observation of Object.values(result.stageObservations)) delete observation.projectKey;\nreturn {json:result,pairedItem:{item:0}};\n});"
+      },
+      "name": "Merge Project Status",
+      "id": "ec7e7d94-0aa0-4e7f-87f8-908d387ef116",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen=new Set(),out=[];\nfor(const [i,item] of $input.all().entries()) {\n const p=item.json,id=String(p.projectId||''),url=p.documentUrl;\n if(!id||typeof url!=='string'||!/^https?:\\/\\//i.test(url)||seen.has(id))continue;\n seen.add(id);\n out.push({json:{projectId:id,sourceUrl:url,sourcePublishedAt:p.publishedAt||null,width:600,quality:80},pairedItem:{item:i}});\n}\nreturn out;"
+      },
+      "name": "Prepare Thumbnail Jobs",
+      "id": "a62d280a-8d01-401f-8ea6-e975edd7d8de",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.sourceUrl }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 5000
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 65000
+        }
+      },
+      "name": "Fetch Thumbnail Source",
+      "id": "60d7a239-197e-4e1e-bfba-95b994c15b9e",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        816,
+        960
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out=[];\nfor(const [i,item] of $input.all().entries()){\n const job=$('Prepare Thumbnail Jobs').itemMatching(i).json;\n const status=Number(item.json.statusCode||0);\n if(status<200||status>=300||!item.binary?.data){console.warn('Source unavailable: '+job.projectId);continue;}\n const b=await this.helpers.getBinaryDataBuffer(i,'data');\n const head=b.subarray(0,2048).toString('utf8');\n const ct=String(item.json.headers?.['content-type']||item.binary.data.mimeType||'').toLowerCase();\n const html=ct.includes('text/html')||ct.includes('application/xhtml+xml')||/^\\s*(?:\\uFEFF)?\\s*(?:<!doctype html|<html)\\b/i.test(head);\n const image=(b[0]===255&&b[1]===216&&b[2]===255)||b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||/^GIF8[79]a/.test(head)||(b.toString('ascii',0,4)==='RIFF'&&b.toString('ascii',8,12)==='WEBP')||b.toString('ascii',0,2)==='BM'||b.subarray(0,4).equals(Buffer.from([73,73,42,0]))||b.subarray(0,4).equals(Buffer.from([77,77,0,42]));\n const format=html?'html':head.startsWith('%PDF-')?'pdf':image?'image':'unsupported';\n if(format==='unsupported'){console.warn('Unsupported source: '+job.projectId);continue;}\n const browserBody={url:job.sourceUrl,viewport:{width:1000,height:1200,deviceScaleFactor:1},gotoOptions:{waitUntil:'networkidle2',timeout:30000},waitForTimeout:2000,bestAttempt:false,waitForFunction:{fn:\"() => {const t=document.body?.innerText||'';return t.length>150&&/ประกาศ|จัดซื้อ|จัดจ้าง|แผนการ|ผู้ชนะ/.test(t)&&!/access denied|verify you are human|checking your browser|เข้าสู่ระบบ|กรุณาลงชื่อเข้าใช้/i.test(t);}\",timeout:20000},options:{type:'webp',quality:80,fullPage:false}};\n out.push({json:{...job,sourceFormat:format,thumbnailSourceUrl:'https://wsrv.nl/?url='+encodeURIComponent(job.sourceUrl)+'&page=0&w=600&output=webp&q=80',browserBody},pairedItem:{item:i}});\n}\nreturn out;"
+      },
+      "name": "Detect Thumbnail Source",
+      "id": "d0cac997-1ec1-4b7d-a5db-3c5092801bb7",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "source-is-html",
+              "leftValue": "={{ $json.sourceFormat }}",
+              "rightValue": "html",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Is HTML Source",
+      "id": "bff529d7-b5ba-4a87-919a-aef9ee3db460",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1296,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://production-sfo.browserless.io/screenshot",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.browserBody) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 5000
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 65000
+        }
+      },
+      "name": "Screenshot HTML",
+      "id": "7f5f3f8f-baf6-40d6-9378-f3687c9046eb",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1536,
+        832
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "bWgLUIb2qhHr3s8c",
+          "name": "Query Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.thumbnailSourceUrl }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 5000
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 65000
+        }
+      },
+      "name": "Render PDF or Image",
+      "id": "2d409d88-801e-4183-8967-668a555b60ec",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1536,
+        1072
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out=[];\nfor(const [i,item] of $input.all().entries()){\n const job=$('Detect Thumbnail Source').itemMatching(i).json;\n const siteStatus=Number(item.json.headers?.['x-response-code']||200);\n if(!item.binary?.data||siteStatus<200||siteStatus>=300){console.warn('Thumbnail failed: '+job.projectId);continue;}\n const b=await this.helpers.getBinaryDataBuffer(i,'data');\n if(b.length<12||b.length>8*1024*1024||b.toString('ascii',0,4)!=='RIFF'||b.toString('ascii',8,12)!=='WEBP'){console.warn('Invalid thumbnail: '+job.projectId);continue;}\n out.push({json:{projectId:job.projectId,contentType:'image/webp',data:b.toString('base64'),sourceUrl:job.sourceUrl,sourcePublishedAt:job.sourcePublishedAt,width:600,quality:80,size:b.length,updatedAt:new Date().toISOString()},pairedItem:{item:i}});\n}\nreturn out;"
+      },
+      "name": "Thumbnail Binary to Mongo",
+      "id": "d65b9c0c-da17-42e2-8d83-2e1e45be4ce8",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "findOneAndUpdate",
+        "collection": "thumbnails",
+        "updateKey": "projectId",
+        "fields": "projectId,contentType,data,sourceUrl,sourcePublishedAt,width,quality,size,updatedAt",
+        "upsert": true,
+        "options": {}
+      },
+      "name": "MongoDB - Upsert Thumbnail",
+      "id": "b0dd6fbd-514f-4e94-9d3a-d03d2c509ea9",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.3,
+      "position": [
+        2016,
+        960
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "88FrqWXjFPn2quwD",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "10 1 * * *"
+            }
+          ]
+        }
+      },
+      "id": "4b0c6b67-4ada-4c2b-a6e4-b75dd0848682",
+      "name": "Daily 01:10 Bangkok",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -608,
+        560
+      ]
+    }
+  ],
+  "connections": {
+    "Build RSS Run Metadata": {
+      "main": [
+        [
+          {
+            "node": "MongoDB - Log Ingestion Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Software IT Titles": {
+      "main": [
+        [
+          {
+            "node": "Build RSS Run Metadata",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Normalize RSS + Thumbnail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "XML to JSON1": {
+      "main": [
+        [
+          {
+            "node": "Filter Software IT Titles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode Thai Windows-874": {
+      "main": [
+        [
+          {
+            "node": "XML to JSON1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "e-GP - Fetch Department Stage": {
+      "main": [
+        [
+          {
+            "node": "Decode Thai Windows-874",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Department + Stage Requests": {
+      "main": [
+        [
+          {
+            "node": "e-GP - Fetch Department Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Existing Projects Batch": {
+      "main": [
+        [
+          {
+            "node": "Merge Project Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB - Upsert TOR Announcements": {
+      "main": [
+        [
+          {
+            "node": "Prepare Thumbnail Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Project Batch Lookup": {
+      "main": [
+        [
+          {
+            "node": "Find Existing Projects Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize RSS + Thumbnail": {
+      "main": [
+        [
+          {
+            "node": "Build Project Batch Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Project Status": {
+      "main": [
+        [
+          {
+            "node": "MongoDB - Upsert TOR Announcements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Thumbnail Jobs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Thumbnail Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Thumbnail Source": {
+      "main": [
+        [
+          {
+            "node": "Detect Thumbnail Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Thumbnail Source": {
+      "main": [
+        [
+          {
+            "node": "Is HTML Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is HTML Source": {
+      "main": [
+        [
+          {
+            "node": "Screenshot HTML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Render PDF or Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Screenshot HTML": {
+      "main": [
+        [
+          {
+            "node": "Thumbnail Binary to Mongo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render PDF or Image": {
+      "main": [
+        [
+          {
+            "node": "Thumbnail Binary to Mongo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Thumbnail Binary to Mongo": {
+      "main": [
+        [
+          {
+            "node": "MongoDB - Upsert Thumbnail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 01:10 Bangkok": {
+      "main": [
+        [
+          {
+            "node": "Department + Stage Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fec1019c9d1e988c58a5e82a15d8d9eecfe7755863c845a82430909ad451696a"
+  }
+}
